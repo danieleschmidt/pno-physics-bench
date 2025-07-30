@@ -205,3 +205,52 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Machine Learning & Research specific
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+*.joblib
+*.model
+*.ckpt
+*.pth
+*.pt
+*.safetensors
+checkpoints/
+models/
+logs/
+runs/
+tensorboard_logs/
+wandb/
+mlruns/
+lightning_logs/
+
+# Data files
+data/
+datasets/
+*.npy
+*.npz
+*.mat
+*.hdf
+*.zarr
+
+# Research outputs
+experiments/
+results/
+figures/
+plots/
+*.pdf
+*.eps
+*.png
+*.jpg
+*.jpeg
+*.svg
+*.gif
+*.tiff
+notebooks/*.html
+
+# Config files with secrets
+config.ini
+secrets.json
+.secrets
