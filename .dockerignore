@@ -1,0 +1,108 @@
+# Docker ignore file for PNO Physics Bench
+
+# Git
+.git
+.gitignore
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environments
+.venv
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Documentation build
+docs/_build/
+
+# Data and models (exclude from image)
+data/
+datasets/
+models/
+checkpoints/
+results/
+experiments/
+
+# ML artifacts
+*.pth
+*.pt
+*.ckpt
+*.h5
+*.pkl
+*.joblib
+wandb/
+mlruns/
+lightning_logs/
+tensorboard_logs/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+.cache/
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Configuration with secrets
+.env
+.env.local
+config.ini
+secrets.json
+
+# Large binary files
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Jupyter notebooks (exclude outputs)
+.ipynb_checkpoints/
+notebooks/*.html
+
+# Research outputs
+*.pdf
+*.eps
+*.png
+*.jpg
+*.jpeg
+figures/
+plots/

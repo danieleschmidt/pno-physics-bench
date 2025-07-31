@@ -1,0 +1,245 @@
+# Main CI/CD Pipeline for PNO Physics Bench
+# Copy this file to .github/workflows/ci.yml
+
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Quick checks that can fail fast
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - uses: pre-commit/action@v3.0.0
+
+  # Comprehensive testing matrix
+  test:
+    needs: pre-commit
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.9', '3.10', '3.11']
+        pytorch-version: ['2.0.0', '2.1.0']
+        include:
+          # Test latest PyTorch on Ubuntu only to reduce CI time
+          - os: ubuntu-latest
+            python-version: '3.11'
+            pytorch-version: 'latest'
+        exclude:
+          # Skip Windows + older PyTorch to reduce CI time
+          - os: windows-latest
+            pytorch-version: '2.0.0'
+
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/pip
+          ~/.cache/torch
+        key: ${{ runner.os }}-py${{ matrix.python-version }}-torch${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml', '**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-py${{ matrix.python-version }}-torch${{ matrix.pytorch-version }}-
+          ${{ runner.os }}-py${{ matrix.python-version }}-
+    
+    - name: Install PyTorch
+      run: |
+        if [ "${{ matrix.pytorch-version }}" = "latest" ]; then
+          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+        else
+          pip install torch==${{ matrix.pytorch-version }} torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+        fi
+      shell: bash
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev,benchmark]"
+    
+    - name: Run tests
+      run: |
+        pytest tests/ -v --cov=src/pno_physics_bench --cov-report=xml --cov-report=term-missing
+      env:
+        # Reduce memory usage for CI
+        TORCH_HOME: ~/.cache/torch
+        PYTORCH_TEST_WITH_SLOW: 0
+    
+    - name: Upload coverage reports
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.9'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  # Type checking
+  type-check:
+    needs: pre-commit
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+    - name: Run mypy
+      run: mypy src/pno_physics_bench --strict --ignore-missing-imports
+
+  # Documentation build test
+  docs:
+    needs: pre-commit
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+    - name: Build docs
+      run: |
+        cd docs
+        make html
+    - name: Upload docs artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: docs-html
+        path: docs/_build/html/
+
+  # Package build test
+  build:
+    needs: [test, type-check]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine
+    - name: Build package
+      run: python -m build
+    - name: Check package
+      run: twine check dist/*
+    - name: Upload package artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dist
+        path: dist/
+
+  # ML-specific tests (model training, inference)
+  ml-tests:
+    needs: pre-commit
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test-suite: [unit, integration, benchmark]
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+        pip install -e ".[dev,benchmark]"
+    - name: Run ML tests
+      run: |
+        if [ "${{ matrix.test-suite }}" = "unit" ]; then
+          pytest tests/unit/ -v --durations=10
+        elif [ "${{ matrix.test-suite }}" = "integration" ]; then
+          pytest tests/integration/ -v --durations=10
+        else
+          pytest tests/benchmark/ -v --benchmark-only --benchmark-json=benchmark.json
+        fi
+    - name: Upload benchmark results
+      if: matrix.test-suite == 'benchmark'
+      uses: actions/upload-artifact@v3
+      with:
+        name: benchmark-results
+        path: benchmark.json
+
+  # Performance regression detection
+  performance:
+    needs: ml-tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Need full history for comparison
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+        pip install -e ".[dev,benchmark]"
+    - name: Run performance comparison
+      run: |
+        # Compare performance against main branch
+        python scripts/compare_performance.py --base-ref=origin/main --head-ref=HEAD
+    - name: Comment PR with results
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          if (fs.existsSync('performance_report.md')) {
+            const report = fs.readFileSync('performance_report.md', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: report
+            });
+          }
+
+  # Final status check
+  ci-success:
+    needs: [test, type-check, docs, build, ml-tests]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+    - name: Check all jobs status
+      run: |
+        if [[ "${{ needs.test.result }}" != "success" ]] || \
+           [[ "${{ needs.type-check.result }}" != "success" ]] || \
+           [[ "${{ needs.docs.result }}" != "success" ]] || \
+           [[ "${{ needs.build.result }}" != "success" ]] || \
+           [[ "${{ needs.ml-tests.result }}" != "success" ]]; then
+          echo "One or more jobs failed"
+          exit 1
+        fi
+        echo "All jobs passed successfully"
