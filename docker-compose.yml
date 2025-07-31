@@ -1,0 +1,224 @@
+# Docker Compose for PNO Physics Bench Development and Deployment
+version: '3.8'
+
+services:
+  # Development environment
+  pno-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+      args:
+        PYTHON_VERSION: 3.9
+        PYTORCH_VERSION: 2.1.0
+    image: pno-physics-bench:dev
+    container_name: pno-dev
+    volumes:
+      - .:/app
+      - pno-cache:/opt/torch
+      - pno-data:/app/data
+      - pno-results:/app/results
+    environment:
+      - WANDB_API_KEY=${WANDB_API_KEY:-}
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-}
+    ports:
+      - "8888:8888"  # Jupyter
+      - "6006:6006"  # TensorBoard
+      - "8000:8000"  # Documentation server
+    stdin_open: true
+    tty: true
+    command: bash
+
+  # Production API server
+  pno-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: pno-physics-bench:latest
+    container_name: pno-api
+    volumes:
+      - pno-models:/app/models
+      - pno-data:/app/data:ro
+    environment:
+      - FLASK_ENV=production
+      - WORKERS=4
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: ["python", "-m", "pno_physics_bench.serving"]
+
+  # GPU-enabled training service
+  pno-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: cuda
+      args:
+        PYTHON_VERSION: 3.9
+        PYTORCH_VERSION: 2.1.0
+        CUDA_VERSION: 11.8
+    image: pno-physics-bench:cuda
+    container_name: pno-gpu
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - WANDB_API_KEY=${WANDB_API_KEY:-}
+    volumes:
+      - .:/app
+      - pno-cache:/opt/torch
+      - pno-data:/app/data
+      - pno-results:/app/results
+      - pno-checkpoints:/app/checkpoints
+    ports:
+      - "8889:8888"  # Jupyter (different port to avoid conflicts)
+      - "6007:6006"  # TensorBoard
+    stdin_open: true
+    tty: true
+    command: bash
+
+  # Jupyter notebook server
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    image: pno-physics-bench:dev
+    container_name: pno-jupyter
+    volumes:
+      - .:/app
+      - pno-cache:/opt/torch
+      - pno-data:/app/data
+      - pno-notebooks:/app/notebooks
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - WANDB_API_KEY=${WANDB_API_KEY:-}
+    ports:
+      - "8888:8888"
+    command: >
+      bash -c "pip install jupyterlab ipywidgets &&
+               jupyter lab --ip=0.0.0.0 --port=8888 --no-browser 
+               --allow-root --NotebookApp.token='' --NotebookApp.password=''"
+
+  # TensorBoard service
+  tensorboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    image: pno-physics-bench:dev
+    container_name: pno-tensorboard
+    volumes:
+      - pno-results:/app/results:ro
+      - pno-tensorboard-logs:/app/tensorboard_logs:ro
+    ports:
+      - "6006:6006"
+    command: tensorboard --logdir=/app/results --host=0.0.0.0 --port=6006
+
+  # Weights & Biases local server (optional)
+  wandb-local:
+    image: wandb/local:latest
+    container_name: pno-wandb
+    ports:
+      - "8080:8080"
+    environment:
+      - MYSQL_ROOT_PASSWORD=wandb
+      - MYSQL_DATABASE=wandb_local
+    volumes:
+      - wandb-data:/vol
+    restart: unless-stopped
+
+  # Redis for caching (for API server)
+  redis:
+    image: redis:7-alpine
+    container_name: pno-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # PostgreSQL for metadata storage
+  postgres:
+    image: postgres:15-alpine
+    container_name: pno-postgres
+    environment:
+      - POSTGRES_DB=pno_physics_bench
+      - POSTGRES_USER=pno
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-pno_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+
+  # Grafana for monitoring
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: pno-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana-dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana-datasources:/etc/grafana/provisioning/datasources:ro
+    restart: unless-stopped
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: pno-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+
+volumes:
+  pno-cache:
+    driver: local
+  pno-data:
+    driver: local
+  pno-results:
+    driver: local
+  pno-models:
+    driver: local
+  pno-checkpoints:
+    driver: local
+  pno-notebooks:
+    driver: local
+  pno-tensorboard-logs:
+    driver: local
+  wandb-data:
+    driver: local
+  redis-data:
+    driver: local
+  postgres-data:
+    driver: local
+  grafana-data:
+    driver: local
+  prometheus-data:
+    driver: local
+
+networks:
+  default:
+    name: pno-network
+    driver: bridge

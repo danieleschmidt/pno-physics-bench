@@ -1,0 +1,432 @@
+# Automated Release Pipeline
+# Copy this file to .github/workflows/release.yml
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Pre-release'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  PYTHON_VERSION: '3.9'
+
+jobs:
+  # Validate release
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_prerelease: ${{ steps.version.outputs.is_prerelease }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Extract version info
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+          IS_PRERELEASE="${{ github.event.inputs.prerelease }}"
+        else
+          VERSION=${GITHUB_REF#refs/tags/}
+          # Check if version contains pre-release identifiers
+          if [[ "$VERSION" =~ (alpha|beta|rc) ]]; then
+            IS_PRERELEASE=true
+          else
+            IS_PRERELEASE=false
+          fi
+        fi
+        
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+        
+        # Validate version format
+        if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[0-9]+)?)?$ ]]; then
+          echo "Invalid version format: $VERSION"
+          exit 1
+        fi
+    
+    - name: Check if version exists
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        if git tag -l | grep -q "^$VERSION$"; then
+          echo "Version $VERSION already exists"
+          exit 1
+        fi
+    
+    - name: Validate changelog
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        VERSION_NO_V=${VERSION#v}
+        
+        if [ -f "CHANGELOG.md" ]; then
+          if ! grep -q "## \[$VERSION_NO_V\]" CHANGELOG.md; then
+            echo "Version $VERSION_NO_V not found in CHANGELOG.md"
+            exit 1
+          fi
+        else
+          echo "CHANGELOG.md not found"
+          exit 1
+        fi
+
+  # Run full test suite
+  test:
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  # Build packages
+  build:
+    needs: [validate, test]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine
+    
+    - name: Update version in package
+      run: |
+        VERSION="${{ needs.validate.outputs.version }}"
+        VERSION_NO_V=${VERSION#v}
+        
+        # Update version in pyproject.toml
+        sed -i "s/version = \".*\"/version = \"$VERSION_NO_V\"/" pyproject.toml
+        
+        # Update version in __init__.py
+        sed -i "s/__version__ = \".*\"/__version__ = \"$VERSION_NO_V\"/" src/pno_physics_bench/__init__.py
+    
+    - name: Build package
+      run: python -m build
+    
+    - name: Check package
+      run: twine check dist/*
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dist-${{ needs.validate.outputs.version }}
+        path: dist/
+        retention-days: 7
+
+  # Generate release notes
+  release-notes:
+    needs: validate
+    runs-on: ubuntu-latest
+    outputs:
+      release_notes: ${{ steps.notes.outputs.release_notes }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Generate release notes
+      id: notes
+      run: |
+        VERSION="${{ needs.validate.outputs.version }}"
+        VERSION_NO_V=${VERSION#v}
+        
+        # Extract changelog section
+        if [ -f "CHANGELOG.md" ]; then
+          # Find the section for this version
+          awk "/^## \[$VERSION_NO_V\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md > release_notes.md
+          
+          # If no specific version section, generate from git
+          if [ ! -s release_notes.md ]; then
+            echo "## What's Changed" > release_notes.md
+            echo "" >> release_notes.md
+            
+            # Get commits since last tag
+            LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+            if [ -n "$LAST_TAG" ]; then
+              git log --pretty=format:"* %s" $LAST_TAG..HEAD >> release_notes.md
+            else
+              git log --pretty=format:"* %s" --max-count=20 >> release_notes.md
+            fi
+          fi
+        else
+          # Generate basic release notes from git
+          echo "## What's Changed" > release_notes.md
+          echo "" >> release_notes.md
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            git log --pretty=format:"* %s" $LAST_TAG..HEAD >> release_notes.md
+          else
+            git log --pretty=format:"* %s" --max-count=20 >> release_notes.md
+          fi
+        fi
+        
+        # Add contributor information
+        echo "" >> release_notes.md
+        echo "## Contributors" >> release_notes.md
+        LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        if [ -n "$LAST_TAG" ]; then
+          git log --pretty=format:"* @%an" $LAST_TAG..HEAD | sort -u >> release_notes.md
+        fi
+        
+        # Set output (escape newlines for GitHub Actions)
+        {
+          echo 'release_notes<<EOF'
+          cat release_notes.md
+          echo EOF
+        } >> $GITHUB_OUTPUT
+    
+    - name: Upload release notes
+      uses: actions/upload-artifact@v3
+      with:
+        name: release-notes-${{ needs.validate.outputs.version }}
+        path: release_notes.md
+
+  # Security scan before release
+  security:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install safety pip-audit
+        pip install -e .
+    
+    - name: Run security checks
+      run: |
+        safety check
+        pip-audit
+
+  # Create GitHub release
+  create-release:
+    needs: [validate, test, build, release-notes, security]
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create.outputs.release_id }}
+      upload_url: ${{ steps.create.outputs.upload_url }}
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: dist-${{ needs.validate.outputs.version }}
+        path: dist/
+    
+    - name: Create GitHub Release
+      id: create
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const { data: release } = await github.rest.repos.createRelease({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            tag_name: '${{ needs.validate.outputs.version }}',
+            name: 'Release ${{ needs.validate.outputs.version }}',
+            body: `${{ needs.release-notes.outputs.release_notes }}`,
+            prerelease: ${{ needs.validate.outputs.is_prerelease }},
+            generate_release_notes: false
+          });
+          
+          core.setOutput('release_id', release.id);
+          core.setOutput('upload_url', release.upload_url);
+          
+          return release.id;
+    
+    - name: Upload release assets
+      run: |
+        for file in dist/*; do
+          filename=$(basename "$file")
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @"$file" \
+            "${{ steps.create.outputs.upload_url }}?name=$filename"
+        done
+
+  # Publish to PyPI
+  publish-pypi:
+    needs: [validate, create-release]
+    runs-on: ubuntu-latest
+    environment: 
+      name: pypi
+      url: https://pypi.org/project/pno-physics-bench/
+    permissions:
+      id-token: write  # For trusted publishing
+    steps:
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: dist-${{ needs.validate.outputs.version }}
+        path: dist/
+    
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        password: ${{ secrets.PYPI_API_TOKEN }}
+        skip-existing: true
+
+  # Publish to Test PyPI (for pre-releases)
+  publish-test-pypi:
+    if: needs.validate.outputs.is_prerelease == 'true'
+    needs: [validate, create-release]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: dist-${{ needs.validate.outputs.version }}
+        path: dist/
+    
+    - name: Publish to Test PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        repository-url: https://test.pypi.org/legacy/
+        skip-existing: true
+
+  # Build and push Docker images
+  docker:
+    needs: [validate, create-release]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v4
+      with:
+        images: pno-physics-bench
+        tags: |
+          type=ref,event=tag
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+    
+    - name: Build and push Docker images
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        target: production
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # Update documentation
+  docs:
+    needs: [validate, create-release]
+    runs-on: ubuntu-latest
+    if: needs.validate.outputs.is_prerelease == 'false'
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+    
+    - name: Build documentation
+      run: |
+        cd docs
+        make html
+    
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./docs/_build/html
+        cname: pno-physics-bench.readthedocs.io
+
+  # Post-release notifications
+  notify:
+    needs: [validate, create-release, publish-pypi, docker]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+    - name: Release success notification
+      if: needs.create-release.result == 'success' && needs.publish-pypi.result == 'success'
+      run: |
+        echo "🎉 Release ${{ needs.validate.outputs.version }} published successfully!"
+        echo "📦 PyPI: https://pypi.org/project/pno-physics-bench/"
+        echo "🐳 Docker: https://hub.docker.com/r/pno-physics-bench"
+        echo "📖 Docs: https://pno-physics-bench.readthedocs.io"
+    
+    - name: Release failure notification
+      if: failure()
+      run: |
+        echo "❌ Release ${{ needs.validate.outputs.version }} failed!"
+        echo "Check the workflow logs for details."
+
+  # Create next development version
+  next-dev:
+    needs: [validate, publish-pypi]
+    runs-on: ubuntu-latest
+    if: needs.validate.outputs.is_prerelease == 'false'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Bump to next dev version
+      run: |
+        VERSION="${{ needs.validate.outputs.version }}"
+        VERSION_NO_V=${VERSION#v}
+        
+        # Calculate next minor version
+        IFS='.' read -ra VERSION_PARTS <<< "$VERSION_NO_V"
+        MAJOR=${VERSION_PARTS[0]}
+        MINOR=${VERSION_PARTS[1]}
+        PATCH=${VERSION_PARTS[2]}
+        
+        NEXT_MINOR=$((MINOR + 1))
+        NEXT_VERSION="$MAJOR.$NEXT_MINOR.0.dev0"
+        
+        # Update version files
+        sed -i "s/version = \".*\"/version = \"$NEXT_VERSION\"/" pyproject.toml
+        sed -i "s/__version__ = \".*\"/__version__ = \"$NEXT_VERSION\"/" src/pno_physics_bench/__init__.py
+        
+        # Commit changes
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add pyproject.toml src/pno_physics_bench/__init__.py
+        git commit -m "Bump version to $NEXT_VERSION [skip ci]"
+        git push

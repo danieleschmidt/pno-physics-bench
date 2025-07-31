@@ -1,0 +1,116 @@
+{
+  "name": "PNO Physics Bench Development",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "pno-dev",
+  "workspaceFolder": "/app",
+  
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": false,
+        "python.linting.flake8Enabled": true,
+        "python.linting.mypyEnabled": true,
+        "python.formatting.provider": "black",
+        "python.formatting.blackArgs": ["--line-length=88"],
+        "python.sortImports.args": ["--profile", "black"],
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["tests/"],
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": true
+        },
+        "files.exclude": {
+          "**/__pycache__": true,
+          "**/*.pyc": true,
+          "**/.pytest_cache": true,
+          "**/.mypy_cache": true,
+          "**/wandb": true,
+          "**/lightning_logs": true
+        },
+        "jupyter.notebookFileRoot": "${workspaceFolder}",
+        "git.enableCommitSigning": false
+      },
+      
+      "extensions": [
+        "ms-python.python",
+        "ms-python.pylint",
+        "ms-python.flake8",
+        "ms-python.mypy-type-checker",
+        "ms-python.black-formatter",
+        "ms-python.isort",
+        "ms-toolsai.jupyter",
+        "ms-toolsai.jupyter-keymap",
+        "ms-toolsai.jupyter-renderers",
+        "ms-vscode.vscode-json",
+        "redhat.vscode-yaml",
+        "ms-vscode.vscode-markdown",
+        "charliermarsh.ruff",
+        "ms-python.vscode-pylance",
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "ms-vscode.test-adapter-converter",
+        "hbenl.vscode-test-explorer",
+        "ms-vscode.makefile-tools",
+        "ms-azuretools.vscode-docker",
+        "eamodio.gitlens"
+      ]
+    }
+  },
+  
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "installOhMyZsh": true,
+      "upgradePackages": true
+    }
+  },
+  
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postStartCommand": "bash .devcontainer/post-start.sh",
+  
+  "mounts": [
+    "source=${localWorkspaceFolder}/.git,target=/app/.git,type=bind,consistency=cached",
+    "source=pno-vscode-extensions,target=/root/.vscode-server/extensions,type=volume"
+  ],
+  
+  "forwardPorts": [8888, 6006, 8000, 5000],
+  "portsAttributes": {
+    "8888": {
+      "label": "Jupyter Lab",
+      "onAutoForward": "notify"
+    },
+    "6006": {
+      "label": "TensorBoard",
+      "onAutoForward": "silent"
+    },
+    "8000": {
+      "label": "Documentation",
+      "onAutoForward": "silent"
+    },
+    "5000": {
+      "label": "API Server",
+      "onAutoForward": "silent"
+    }
+  },
+  
+  "remoteEnv": {
+    "PYTHONPATH": "/app/src",
+    "WANDB_MODE": "offline",
+    "JUPYTER_ENABLE_LAB": "yes"
+  },
+  
+  "containerEnv": {
+    "DISPLAY": "${localEnv:DISPLAY}",
+    "TERM": "xterm-256color"
+  },
+  
+  "runArgs": [
+    "--network=pno-network"
+  ],
+  
+  "shutdownAction": "stopCompose"
+}
