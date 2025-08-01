@@ -64,11 +64,37 @@ repos:
 
   # Security scanning
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.4
+    rev: 1.7.5
     hooks:
       - id: bandit
         args: [-r, src/, -f, json, -o, bandit-report.json]
         pass_filenames: false
+
+  # Dependency security scanning
+  - repo: local
+    hooks:
+      - id: safety
+        name: safety-check
+        entry: safety
+        language: system
+        args: [check, --json, --output, safety-report.json]
+        files: requirements.*\.txt$
+        require_serial: true
+      - id: pip-audit
+        name: pip-audit
+        entry: pip-audit
+        language: system
+        args: [--format=json, --output=pip-audit-report.json]
+        files: requirements.*\.txt$
+        require_serial: true
+
+  # Secrets detection
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+        exclude: .*\.(ipynb|lock)$
 
   # Documentation
   - repo: https://github.com/pycqa/pydocstyle
