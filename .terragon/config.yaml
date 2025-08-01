@@ -1,0 +1,137 @@
+## Terragon Autonomous SDLC Configuration
+## Repository: pno-physics-bench
+## Maturity Level: MATURING (75-80%)
+## Last Updated: 2025-01-15
+
+repository:
+  name: "pno-physics-bench"
+  maturity_level: "maturing"
+  maturity_score: 78
+  primary_language: "python"
+  framework: "pytorch"
+  domain: "scientific-ml"
+
+scoring:
+  weights:
+    # Adaptive weights for MATURING repositories
+    wsjf: 0.5              # Weighted Shortest Job First
+    ice: 0.1               # Impact-Confidence-Ease
+    technicalDebt: 0.3     # Technical debt priority boost
+    security: 0.1          # Security vulnerability boost
+  
+  thresholds:
+    minScore: 15.0         # Minimum composite score to execute
+    maxRisk: 0.7           # Maximum risk tolerance
+    securityBoost: 2.0     # Security issue multiplier
+    complianceBoost: 1.8   # Compliance issue multiplier
+    debtPenalty: 0.8       # Technical debt discount factor
+
+discovery:
+  sources:
+    - gitHistory           # Parse TODO/FIXME/HACK comments
+    - staticAnalysis       # Code quality metrics
+    - issueTrackers        # GitHub issues integration
+    - vulnerabilityDbs     # Security vulnerability scanning
+    - performanceMonitor   # Performance regression detection
+    - dependencyAudit      # Dependency update tracking
+  
+  schedules:
+    immediate: "pr_merge"  # Execute on PR merge
+    hourly: "security_scan" # Security vulnerability check
+    daily: "comprehensive_analysis" # Full static analysis
+    weekly: "deep_review"  # Architecture assessment
+    monthly: "strategic_review" # Value alignment check
+
+  tools:
+    staticAnalysis:
+      - "mypy"             # Type checking
+      - "black"            # Code formatting
+      - "isort"            # Import sorting
+      - "flake8"           # Linting
+      - "bandit"           # Security linting
+    security:
+      - "safety"           # Known vulnerability check
+      - "pip-audit"        # Dependency vulnerability scan
+      - "semgrep"          # Security pattern matching
+    performance:
+      - "pytest-benchmark" # Performance regression tests
+      - "memory-profiler"  # Memory usage analysis
+    dependencies:
+      - "pip-tools"        # Dependency management
+      - "dependabot"       # Automated updates
+
+execution:
+  maxConcurrentTasks: 1    # Single-threaded execution
+  maxExecutionTime: 7200   # 2 hours maximum per task
+  
+  testRequirements:
+    minCoverage: 80        # Minimum test coverage %
+    performanceRegression: 5 # Max % performance regression
+    memoryRegression: 10   # Max % memory regression
+  
+  rollbackTriggers:
+    - "test_failure"       # Any test failure
+    - "build_failure"      # Build/compilation failure  
+    - "security_violation" # Security scan failure
+    - "coverage_drop"      # Coverage below threshold
+    - "lint_failure"       # Code quality failure
+  
+  branchNaming: "auto-value/{item.id}-{item.slug}"
+  prLabels:
+    - "autonomous"
+    - "value-driven"
+    - "terragon-sdlc"
+
+quality:
+  codeStandards:
+    lineLength: 88         # Black standard
+    typeChecking: "strict" # mypy strict mode
+    testCoverage: 80       # Minimum coverage
+    complexity: 10         # Max cyclomatic complexity
+  
+  securityStandards:
+    vulnerabilityAge: 30   # Max days for known vulns
+    dependencyAge: 90      # Max days for outdated deps
+    secretScanning: true   # Enable secret detection
+    sbomGeneration: true   # Generate SBOM
+
+monitoring:
+  valueMetrics:
+    trackingFile: ".terragon/value-metrics.json"
+    historyDepth: 100      # Number of executions to track
+    
+  alerts:
+    slackWebhook: null     # Slack integration (optional)
+    emailNotifications: false
+    
+  reporting:
+    weeklyReport: true     # Generate weekly value report
+    monthlyDashboard: true # Generate monthly dashboard
+    backlogUpdate: true    # Update BACKLOG.md automatically
+
+integration:
+  github:
+    useCodeowners: true    # Use CODEOWNERS for PR reviews
+    autoAssignReviewers: true
+    requireApproval: true  # Require human approval for PRs
+    
+  cicd:
+    runTestsOnPR: true     # Run full test suite
+    requirePassingChecks: true
+    deployOnMerge: false   # Manual deployment only
+    
+  external:
+    wandbIntegration: true  # Weights & Biases logging
+    tensorboardLogs: true   # TensorBoard integration
+    prometheusMetrics: true # Prometheus monitoring
+
+learning:
+  adaptiveWeights: true    # Learn from execution outcomes
+  feedbackLoop: true       # Update scoring based on results
+  patternRecognition: true # Identify common task patterns
+  velocityOptimization: true # Optimize task selection for velocity
+  
+  calibration:
+    effortEstimation: true # Improve effort predictions
+    impactPrediction: true # Improve impact predictions
+    riskAssessment: true   # Improve risk assessment
