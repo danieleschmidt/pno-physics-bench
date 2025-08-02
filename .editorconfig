@@ -10,10 +10,11 @@ end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
 indent_style = space
-indent_size = 4
+indent_size = 2
 
 # Python files
 [*.py]
+indent_size = 4
 max_line_length = 88
 
 # YAML files
@@ -27,19 +28,35 @@ indent_size = 2
 # Markdown files
 [*.md]
 trim_trailing_whitespace = false
+max_line_length = 120
+
+# Shell scripts
+[*.{sh,bash}]
+indent_size = 2
+
+# Makefile
+[Makefile]
+indent_style = tab
+indent_size = 4
+
+# Docker files
+[{Dockerfile,Dockerfile.*}]
+indent_size = 2
 
 # Configuration files
-[*.{toml,cfg,ini}]
+[*.{ini,cfg,conf,toml}]
 indent_size = 2
 
 # Web files
 [*.{html,css,js,ts}]
 indent_size = 2
 
-# Makefiles
-[Makefile]
-indent_style = tab
+# LaTeX files
+[*.{tex,bib}]
+indent_size = 2
+max_line_length = 120
 
-# Batch files
-[*.{cmd,bat}]
-end_of_line = crlf
+# RST files (Sphinx documentation)
+[*.rst]
+indent_size = 3
+max_line_length = 120
