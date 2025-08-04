@@ -479,7 +479,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ```bibtex
 @article{pno_physics_bench,
   title={Probabilistic Neural Operators: Uncertainty Quantification for Neural PDE Solvers},
-  author={Your Name},
+  author={Daniel Schmidt},
   journal={arXiv preprint arXiv:2025.xxxxx},
   year={2025}
 }
