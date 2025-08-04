@@ -9,7 +9,11 @@ from typing import Dict, List, Optional, Callable, Any, Union
 import logging
 import time
 from pathlib import Path
-import wandb
+try:
+    import wandb
+    HAS_WANDB = True
+except ImportError:
+    HAS_WANDB = False
 from tqdm import tqdm
 
 from .losses import PNOLoss, ELBOLoss
@@ -96,8 +100,8 @@ class PNOTrainer:
         
         # Logging setup
         self.log_interval = log_interval
-        self.use_wandb = use_wandb
-        if use_wandb and wandb_project:
+        self.use_wandb = use_wandb and HAS_WANDB
+        if self.use_wandb and wandb_project:
             wandb.init(project=wandb_project)
             wandb.watch(self.model)
         
@@ -407,7 +411,7 @@ class PNOTrainer:
         logger.info(log_msg)
         
         # Weights & Biases logging
-        if self.use_wandb:
+        if self.use_wandb and HAS_WANDB:
             log_dict = {
                 'epoch': epoch + 1,
                 'train/loss': train_metrics['loss'],

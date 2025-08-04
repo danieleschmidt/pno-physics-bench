@@ -6,7 +6,11 @@ from typing import Dict, Optional, Any, List
 import logging
 from pathlib import Path
 import matplotlib.pyplot as plt
-import wandb
+try:
+    import wandb
+    HAS_WANDB = True
+except ImportError:
+    HAS_WANDB = False
 
 
 logger = logging.getLogger(__name__)
@@ -390,7 +394,7 @@ class MetricsLogger(Callback):
                        f"{lr:.2e},{ece:.6f},{coverage_90:.6f}\n")
         
         # Log to W&B
-        if self.log_to_wandb and wandb.run is not None:
+        if self.log_to_wandb and HAS_WANDB and wandb.run is not None:
             log_dict = {
                 'epoch': epoch + 1,
                 'learning_rate': trainer.optimizer.param_groups[0]['lr'],
