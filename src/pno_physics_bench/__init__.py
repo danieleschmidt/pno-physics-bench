@@ -12,19 +12,20 @@ __license__ = "MIT"
 
 # Core imports for convenience
 try:
-    from .models import ProbabilisticNeuralOperator
+    from .models import ProbabilisticNeuralOperator, FourierNeuralOperator, DeepONet
     from .training import PNOTrainer
     from .datasets import PDEDataset
-    from .uncertainty import UncertaintyDecomposer
     from .metrics import CalibrationMetrics
     
     __all__ = [
         "ProbabilisticNeuralOperator",
+        "FourierNeuralOperator",
+        "DeepONet",
         "PNOTrainer", 
         "PDEDataset",
-        "UncertaintyDecomposer",
         "CalibrationMetrics",
     ]
-except ImportError:
+except ImportError as e:
     # Allow package to be imported even if dependencies aren't installed
     __all__ = []
+    print(f"Warning: Could not import core components: {e}")
