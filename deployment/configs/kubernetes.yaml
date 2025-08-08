@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pno-physics-bench
+  labels:
+    app: pno-physics-bench
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pno-physics-bench
+  template:
+    metadata:
+      labels:
+        app: pno-physics-bench
+    spec:
+      containers:
+      - name: pno-physics-bench
+        image: pno-physics-bench:latest
+        ports:
+        - containerPort: 8000
+        - containerPort: 8001
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "8Gi"
+            cpu: "4000m"
+        env:
+        - name: CONFIG_PATH
+          value: "/app/deployment/configs/production.json"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pno-physics-bench-service
+spec:
+  selector:
+    app: pno-physics-bench
+  ports:
+  - name: api
+    port: 8000
+    targetPort: 8000
+  - name: metrics
+    port: 8001
+    targetPort: 8001
+  type: LoadBalancer

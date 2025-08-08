@@ -245,19 +245,23 @@ class ProbabilisticNeuralOperator(BaseNeuralOperator):
         self.project_mean = nn.Conv2d(hidden_dim, 1, 1)
         self.project_log_var = nn.Conv2d(hidden_dim, 1, 1)
         
-        # Initialize log_var parameters to small values
+        # Initialize log_var parameters to small values for numerical stability
         for layer in self.linear_log_var:
-            nn.init.constant_(layer.weight, -5.0)
-            nn.init.constant_(layer.bias, -5.0)
-        nn.init.constant_(self.lift_log_var.weight, -5.0)
-        nn.init.constant_(self.lift_log_var.bias, -5.0)
-        nn.init.constant_(self.project_log_var.weight, -5.0)
-        nn.init.constant_(self.project_log_var.bias, -5.0)
+            nn.init.constant_(layer.weight, -3.0)  # Less extreme initialization
+            nn.init.constant_(layer.bias, -3.0)
+        nn.init.constant_(self.lift_log_var.weight, -3.0)
+        nn.init.constant_(self.lift_log_var.bias, -3.0)
+        nn.init.constant_(self.project_log_var.weight, -3.0)
+        nn.init.constant_(self.project_log_var.bias, -3.0)
         
     def reparameterize(self, mean: torch.Tensor, log_var: torch.Tensor) -> torch.Tensor:
         """Reparameterization trick for sampling."""
         if self.training:
+            # Clamp log_var to prevent numerical instability
+            log_var = torch.clamp(log_var, min=-10.0, max=10.0)
             std = torch.exp(0.5 * log_var)
+            # Add small epsilon for numerical stability
+            std = torch.clamp(std, min=1e-6)
             eps = torch.randn_like(std)
             return mean + eps * std
         else:
@@ -311,7 +315,10 @@ class ProbabilisticNeuralOperator(BaseNeuralOperator):
             mean = self.forward(x, sample=False)
             # Compute predictive variance (epistemic + aleatoric)
             log_var = self.project_log_var(self.get_final_features(x))
+            # Clamp for numerical stability
+            log_var = torch.clamp(log_var, min=-10.0, max=10.0)
             std = torch.exp(0.5 * log_var)
+            std = torch.clamp(std, min=1e-6)  # Ensure positive std
         return mean, std
     
     def get_final_features(self, x: torch.Tensor) -> torch.Tensor:

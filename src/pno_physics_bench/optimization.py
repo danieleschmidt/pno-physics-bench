@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from functools import lru_cache
 import gc
 
-from .exceptions import ResourceError, OptimizationError
+# from .exceptions import ResourceError, OptimizationError  # Not implemented yet
 from .logging_config import PerformanceLogger
 
 
@@ -645,24 +645,30 @@ def optimize_dataloader(
         import multiprocessing
         num_workers = min(multiprocessing.cpu_count(), 8)
     
-    # Create optimized DataLoader
-    optimized_loader = DataLoader(
-        dataloader.dataset,
-        batch_size=dataloader.batch_size,
-        shuffle=False,  # Preserve original shuffle from sampler
-        sampler=dataloader.sampler,
-        batch_sampler=dataloader.batch_sampler,
-        num_workers=num_workers,
-        collate_fn=dataloader.collate_fn,
-        pin_memory=pin_memory and torch.cuda.is_available(),
-        drop_last=dataloader.drop_last,
-        timeout=0,
-        worker_init_fn=dataloader.worker_init_fn,
-        multiprocessing_context=dataloader.multiprocessing_context,
-        generator=dataloader.generator,
-        prefetch_factor=2,
-        persistent_workers=persistent_workers and num_workers > 0,
-    )
+    # Create optimized DataLoader - handle batch_sampler conflicts
+    kwargs = {
+        'dataset': dataloader.dataset,
+        'num_workers': num_workers,
+        'collate_fn': dataloader.collate_fn,
+        'pin_memory': pin_memory and torch.cuda.is_available(),
+        'timeout': 0,
+        'worker_init_fn': dataloader.worker_init_fn,
+        'multiprocessing_context': dataloader.multiprocessing_context,
+        'generator': dataloader.generator,
+        'prefetch_factor': 2,
+        'persistent_workers': persistent_workers and num_workers > 0,
+    }
+    
+    # Handle mutually exclusive options
+    if dataloader.batch_sampler is not None:
+        kwargs['batch_sampler'] = dataloader.batch_sampler
+    else:
+        kwargs['batch_size'] = dataloader.batch_size
+        kwargs['shuffle'] = False  # Preserve original behavior
+        kwargs['sampler'] = dataloader.sampler
+        kwargs['drop_last'] = dataloader.drop_last
+    
+    optimized_loader = DataLoader(**kwargs)
     
     logger.info(f"Optimized DataLoader: {num_workers} workers, pin_memory={pin_memory}")
     return optimized_loader

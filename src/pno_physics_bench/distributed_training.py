@@ -7,7 +7,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data.distributed import DistributedSampler
 import os
 import logging
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional, Callable, List
 import time
 from contextlib import contextmanager
 import socket
