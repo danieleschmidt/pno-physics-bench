@@ -177,12 +177,15 @@ class SyntheticNavierStokesDataset(BasePDEDataset):
     
     def _generate_initial_vorticity(self) -> np.ndarray:
         """Generate random initial vorticity field."""
+        # Determine number of modes based on resolution
+        max_modes = min(8, self.resolution, self.resolution//2 + 1)
+        
         # Create random Fourier modes
-        modes = np.random.randn(8, 8) + 1j * np.random.randn(8, 8)
+        modes = np.random.randn(max_modes, max_modes) + 1j * np.random.randn(max_modes, max_modes)
         
         # Create full spectrum
         full_modes = np.zeros((self.resolution, self.resolution//2 + 1), dtype=complex)
-        full_modes[:8, :8] = modes
+        full_modes[:max_modes, :max_modes] = modes
         
         # Convert to physical space
         vorticity = np.fft.irfft2(full_modes)
@@ -282,11 +285,14 @@ class SyntheticDarcyFlowDataset(BasePDEDataset):
     
     def _generate_permeability_field(self) -> np.ndarray:
         """Generate random log-permeability field."""
+        # Determine number of modes based on resolution
+        max_modes = min(8, self.resolution, self.resolution//2 + 1)
+        
         # Generate correlated random field using FFT
-        modes = np.random.randn(8, 8) + 1j * np.random.randn(8, 8)
+        modes = np.random.randn(max_modes, max_modes) + 1j * np.random.randn(max_modes, max_modes)
         
         full_modes = np.zeros((self.resolution, self.resolution//2 + 1), dtype=complex)
-        full_modes[:8, :8] = modes
+        full_modes[:max_modes, :max_modes] = modes
         
         # Apply correlation
         kx = np.fft.fftfreq(self.resolution)[:, np.newaxis]

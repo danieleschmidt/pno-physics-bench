@@ -34,7 +34,6 @@ def test_model_creation():
         # Test PNO
         pno = ProbabilisticNeuralOperator(
             input_dim=3,
-            output_dim=3,
             hidden_dim=32,
             num_layers=2,
             modes=8
@@ -44,7 +43,6 @@ def test_model_creation():
         # Test FNO
         fno = FourierNeuralOperator(
             input_dim=3,
-            output_dim=3,
             hidden_dim=32,
             num_layers=2,
             modes=8
@@ -53,9 +51,8 @@ def test_model_creation():
         
         # Test DeepONet
         deeponet = DeepONet(
-            input_dim=3,
-            output_dim=3,
-            grid_size=32
+            branch_net_dims=[3*32*32, 512, 512, 512],
+            trunk_net_dims=[2, 512, 512, 512]
         )
         print(f"✓ DeepONet created: {sum(p.numel() for p in deeponet.parameters())} parameters")
         
@@ -80,15 +77,13 @@ def test_forward_pass():
         # Test PNO
         pno = ProbabilisticNeuralOperator(
             input_dim=input_dim,
-            output_dim=input_dim,
             hidden_dim=16,
             num_layers=2,
-            modes=4,
-            input_size=(height, width)
+            modes=4
         )
         
-        mean, log_var = pno(x, sample=False)
-        print(f"✓ PNO forward pass: {mean.shape}, {log_var.shape}")
+        output = pno(x, sample=False)
+        print(f"✓ PNO forward pass: {output.shape}")
         
         # Test uncertainty prediction
         pred_mean, pred_std = pno.predict_with_uncertainty(x, num_samples=5)
@@ -97,11 +92,9 @@ def test_forward_pass():
         # Test FNO
         fno = FourierNeuralOperator(
             input_dim=input_dim,
-            output_dim=input_dim,
             hidden_dim=16,
             num_layers=2,
-            modes=4,
-            input_size=(height, width)
+            modes=4
         )
         
         output = fno(x)
@@ -109,9 +102,8 @@ def test_forward_pass():
         
         # Test DeepONet
         deeponet = DeepONet(
-            input_dim=input_dim,
-            output_dim=input_dim,
-            grid_size=height
+            branch_net_dims=[input_dim*height*width, 64, 64, 64],
+            trunk_net_dims=[2, 64, 64, 64]
         )
         
         output = deeponet(x)
@@ -132,11 +124,10 @@ def test_dataset_creation():
         from pno_physics_bench.datasets import PDEDataset
         
         # Test Navier-Stokes dataset
-        dataset = PDEDataset(
-            pde_name="navier_stokes_2d",
+        dataset = PDEDataset.load(
+            name="navier_stokes_2d",
             resolution=16,  # Small for testing
-            num_samples=5,
-            generate_on_demand=True
+            num_samples=5
         )
         
         print(f"✓ Dataset created: {len(dataset)} samples")
@@ -146,7 +137,7 @@ def test_dataset_creation():
         print(f"✓ Sample shapes: input {input_data.shape}, target {target_data.shape}")
         
         # Test data loaders
-        train_loader, val_loader, test_loader = dataset.get_loaders(batch_size=2)
+        train_loader, val_loader, test_loader = PDEDataset.get_loaders(dataset, batch_size=2)
         print(f"✓ Data loaders created: {len(train_loader)} train batches")
         
         # Test batch
@@ -239,21 +230,18 @@ def test_training_setup():
         # Create small model and dataset
         model = ProbabilisticNeuralOperator(
             input_dim=3,
-            output_dim=3,
             hidden_dim=8,
             num_layers=1,
-            modes=2,
-            input_size=(8, 8)
+            modes=2
         )
         
-        dataset = PDEDataset(
-            pde_name="navier_stokes_2d",
+        dataset = PDEDataset.load(
+            name="navier_stokes_2d",
             resolution=8,
-            num_samples=4,
-            generate_on_demand=True
+            num_samples=4
         )
         
-        train_loader, val_loader, _ = dataset.get_loaders(batch_size=2)
+        train_loader, val_loader, _ = PDEDataset.get_loaders(dataset, batch_size=2)
         
         # Create trainer
         trainer = PNOTrainer(
@@ -268,7 +256,7 @@ def test_training_setup():
         
         # Test single training step
         for inputs, targets in train_loader:
-            outputs = model(inputs, sample=True, return_kl=True)
+            outputs = model(inputs, sample=True)
             losses = trainer.loss_fn(outputs, targets, model)
             print(f"✓ Training step: loss = {losses['total'].item():.4f}")
             break

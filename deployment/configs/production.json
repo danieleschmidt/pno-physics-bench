@@ -1,0 +1,35 @@
+{
+  "environment": "production",
+  "model": {
+    "checkpoint_path": "models/production_model.pt",
+    "device": "auto",
+    "optimization": {
+      "compile": true,
+      "half_precision": false,
+      "batch_size_optimization": true
+    }
+  },
+  "training": {
+    "distributed": true,
+    "gradient_clipping": 1.0,
+    "mixed_precision": true,
+    "checkpoint_interval": 100
+  },
+  "monitoring": {
+    "enable_metrics": true,
+    "metrics_port": 8000,
+    "log_level": "INFO",
+    "health_checks": true
+  },
+  "scaling": {
+    "auto_scaling": true,
+    "min_workers": 1,
+    "max_workers": 8,
+    "target_memory_gb": 8.0
+  },
+  "security": {
+    "input_validation": true,
+    "parameter_bounds_check": true,
+    "memory_limits": true
+  }
+}
