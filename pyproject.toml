@@ -169,7 +169,7 @@ addopts = """
     --cov-fail-under=80
 """
 markers = [
-    "slow: marks tests as slow (deselect with '-m "not slow"')",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
     "gpu: marks tests that require GPU"
 ]
@@ -188,6 +188,6 @@ exclude_lines = [
     "raise NotImplementedError",
     "if 0:",
     "if __name__ == .__main__.:",
-    "class .*\bProtocol\):",
-    "@(abc\.)?abstractmethod"
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod"
 ]
