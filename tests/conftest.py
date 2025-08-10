@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Generator, Dict, Any
 
 # Test configuration
-pytest_plugins = ["pytest_benchmark"]
+# pytest_plugins = ["pytest_benchmark"]  # Disabled for now
 
 
 # Device fixtures

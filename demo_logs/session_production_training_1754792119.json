@@ -1,0 +1,15 @@
+{
+  "session_name": "production_training",
+  "duration_seconds": 18.2748019695282,
+  "total_epochs": 0,
+  "errors": 1,
+  "warnings": 0,
+  "metrics_history": [],
+  "final_system_health": {
+    "timestamp": 1754792118.8227599,
+    "cpu_percent": 0.5,
+    "memory_percent": 29.6,
+    "available_memory_gb": 2.7090187072753906,
+    "disk_usage_percent": 22.1
+  }
+}
