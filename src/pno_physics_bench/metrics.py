@@ -1,11 +1,14 @@
 """Calibration and uncertainty quality metrics for PNO evaluation."""
 
 import torch
+import torch.nn.functional as F
 import numpy as np
 from typing import Dict, List, Tuple, Optional, Union
 from scipy import stats
 import warnings
 import matplotlib.pyplot as plt
+from collections import defaultdict
+import seaborn as sns
 
 
 class CalibrationMetrics:
@@ -467,3 +470,342 @@ class CalibrationMetrics:
             mpiw_results[f'mpiw_{int((1-alpha)*100)}'] = interval_width.mean().item()
         
         return mpiw_results
+    
+    def uncertainty_quality_index(
+        self,
+        predictions: torch.Tensor,
+        uncertainties: torch.Tensor,
+        targets: torch.Tensor,
+        alpha: float = 0.95
+    ) -> float:
+        """Compute Uncertainty Quality Index (UQI) combining coverage and sharpness.
+        
+        Args:
+            predictions: Model predictions
+            uncertainties: Predicted uncertainties
+            targets: Ground truth targets
+            alpha: Confidence level
+            
+        Returns:
+            UQI score (higher is better)
+        """
+        # Coverage component
+        coverage = self.prediction_interval_coverage_probability(
+            predictions, uncertainties, targets, [1 - alpha]
+        )[f'picp_{int(alpha*100)}']
+        
+        # Sharpness component (inverted and normalized)
+        sharpness_raw = self.sharpness(uncertainties)
+        max_possible_uncertainty = targets.std().item()
+        sharpness_normalized = 1 - (sharpness_raw / max_possible_uncertainty)
+        sharpness_normalized = max(0, min(1, sharpness_normalized))
+        
+        # Combined UQI (weighted harmonic mean of coverage and sharpness)
+        uqi = 2 * coverage * sharpness_normalized / (coverage + sharpness_normalized + 1e-8)
+        
+        return uqi
+    
+    def adaptive_calibration_error(
+        self,
+        predictions: torch.Tensor,
+        uncertainties: torch.Tensor,
+        targets: torch.Tensor,
+        adaptive_bins: bool = True
+    ) -> Dict[str, float]:
+        """Compute Adaptive Calibration Error with variable bin sizes.
+        
+        Args:
+            predictions: Model predictions
+            uncertainties: Predicted uncertainties
+            targets: Ground truth targets
+            adaptive_bins: Whether to use adaptive binning
+            
+        Returns:
+            Dictionary with ACE metrics
+        """
+        errors = torch.abs(predictions - targets)
+        uncertainty_flat = uncertainties.flatten()
+        errors_flat = errors.flatten()
+        
+        if adaptive_bins:
+            # Use quantile-based adaptive binning
+            quantiles = torch.linspace(0, 1, 21)  # 20 adaptive bins
+            bin_edges = torch.quantile(uncertainty_flat, quantiles)
+        else:
+            # Use uniform binning
+            bin_edges = torch.linspace(uncertainty_flat.min(), uncertainty_flat.max(), 21)
+        
+        adaptive_errors = []
+        bin_sizes = []
+        
+        for i in range(len(bin_edges) - 1):
+            mask = (uncertainty_flat >= bin_edges[i]) & (uncertainty_flat < bin_edges[i + 1])
+            if i == len(bin_edges) - 2:  # Include last edge
+                mask |= (uncertainty_flat == bin_edges[i + 1])
+            
+            if mask.sum() > 0:
+                bin_uncertainty = uncertainty_flat[mask].mean()
+                bin_error = errors_flat[mask].mean()
+                bin_size = mask.sum().item()
+                
+                adaptive_errors.append(abs(bin_uncertainty - bin_error))
+                bin_sizes.append(bin_size)
+        
+        # Weighted ACE by bin sizes
+        total_samples = len(uncertainty_flat)
+        weights = [size / total_samples for size in bin_sizes]
+        ace = sum(w * err for w, err in zip(weights, adaptive_errors))
+        
+        return {
+            'adaptive_calibration_error': ace,
+            'num_adaptive_bins': len(adaptive_errors),
+            'avg_bin_size': np.mean(bin_sizes) if bin_sizes else 0
+        }
+    
+    def uncertainty_decomposition_metrics(
+        self,
+        aleatoric_uncertainty: torch.Tensor,
+        epistemic_uncertainty: torch.Tensor,
+        total_uncertainty: torch.Tensor
+    ) -> Dict[str, float]:
+        """Compute metrics for uncertainty decomposition quality.
+        
+        Args:
+            aleatoric_uncertainty: Aleatoric (data) uncertainty
+            epistemic_uncertainty: Epistemic (model) uncertainty
+            total_uncertainty: Total uncertainty
+            
+        Returns:
+            Dictionary with decomposition metrics
+        """
+        # Flatten tensors
+        aleatoric = aleatoric_uncertainty.flatten()
+        epistemic = epistemic_uncertainty.flatten()
+        total = total_uncertainty.flatten()
+        
+        # Verify decomposition consistency
+        reconstructed_total = torch.sqrt(aleatoric**2 + epistemic**2)
+        decomposition_error = torch.mean(torch.abs(total - reconstructed_total)).item()
+        
+        # Uncertainty ratios
+        aleatoric_ratio = torch.mean(aleatoric / (total + 1e-8)).item()
+        epistemic_ratio = torch.mean(epistemic / (total + 1e-8)).item()
+        
+        # Correlation between uncertainty types
+        corr_coef = torch.corrcoef(torch.stack([aleatoric, epistemic]))[0, 1].item()
+        
+        # Dominance analysis
+        aleatoric_dominant = (aleatoric > epistemic).float().mean().item()
+        epistemic_dominant = (epistemic > aleatoric).float().mean().item()
+        
+        return {
+            'decomposition_error': decomposition_error,
+            'aleatoric_ratio': aleatoric_ratio,
+            'epistemic_ratio': epistemic_ratio,
+            'uncertainty_correlation': corr_coef,
+            'aleatoric_dominance': aleatoric_dominant,
+            'epistemic_dominance': epistemic_dominant
+        }
+    
+    def frequency_domain_calibration(
+        self,
+        predictions: torch.Tensor,
+        uncertainties: torch.Tensor,
+        targets: torch.Tensor,
+        max_frequency: int = 50
+    ) -> Dict[str, List[float]]:
+        """Analyze calibration in frequency domain (for spatial/temporal data).
+        
+        Args:
+            predictions: Model predictions [batch, channels, height, width]
+            uncertainties: Predicted uncertainties
+            targets: Ground truth targets
+            max_frequency: Maximum frequency component to analyze
+            
+        Returns:
+            Dictionary with frequency-wise calibration metrics
+        """
+        if len(predictions.shape) < 3:
+            raise ValueError("Frequency domain analysis requires spatial/temporal data")
+        
+        # Take 2D FFT
+        pred_fft = torch.fft.fft2(predictions)
+        unc_fft = torch.fft.fft2(uncertainties)
+        target_fft = torch.fft.fft2(targets)
+        
+        # Get frequency magnitudes
+        pred_mag = torch.abs(pred_fft)
+        unc_mag = torch.abs(unc_fft)
+        target_mag = torch.abs(target_fft)
+        
+        h, w = pred_fft.shape[-2:]
+        freq_errors = []
+        freq_uncertainties = []
+        
+        # Analyze by frequency rings
+        center_h, center_w = h // 2, w // 2
+        max_freq = min(max_frequency, min(center_h, center_w))
+        
+        for freq in range(1, max_freq):
+            # Create frequency mask for current ring
+            y, x = torch.meshgrid(torch.arange(h), torch.arange(w), indexing='ij')
+            dist = torch.sqrt((y - center_h)**2 + (x - center_w)**2)
+            mask = (dist >= freq - 0.5) & (dist < freq + 0.5)
+            
+            if mask.sum() > 0:
+                freq_pred = pred_mag[..., mask].mean()
+                freq_unc = unc_mag[..., mask].mean()
+                freq_target = target_mag[..., mask].mean()
+                
+                freq_error = torch.abs(freq_pred - freq_target)
+                freq_errors.append(freq_error.item())
+                freq_uncertainties.append(freq_unc.item())
+        
+        return {
+            'frequency_errors': freq_errors,
+            'frequency_uncertainties': freq_uncertainties,
+            'frequency_calibration_error': np.mean([abs(e - u) for e, u in zip(freq_errors, freq_uncertainties)])
+        }
+    
+    def temporal_calibration_drift(
+        self,
+        predictions_sequence: List[torch.Tensor],
+        uncertainties_sequence: List[torch.Tensor],
+        targets_sequence: List[torch.Tensor]
+    ) -> Dict[str, float]:
+        """Analyze calibration drift over time/iteration sequences.
+        
+        Args:
+            predictions_sequence: List of predictions over time
+            uncertainties_sequence: List of uncertainties over time
+            targets_sequence: List of targets over time
+            
+        Returns:
+            Dictionary with temporal drift metrics
+        """
+        calibration_errors = []
+        
+        for pred, unc, target in zip(predictions_sequence, uncertainties_sequence, targets_sequence):
+            ece = self.expected_calibration_error(pred, unc, target, num_bins=10)
+            calibration_errors.append(ece)
+        
+        # Analyze drift
+        calibration_trend = np.polyfit(range(len(calibration_errors)), calibration_errors, 1)[0]
+        calibration_variance = np.var(calibration_errors)
+        calibration_stability = 1 / (1 + calibration_variance)
+        
+        return {
+            'calibration_drift_rate': calibration_trend,
+            'calibration_variance': calibration_variance,
+            'calibration_stability': calibration_stability,
+            'initial_calibration': calibration_errors[0] if calibration_errors else 0,
+            'final_calibration': calibration_errors[-1] if calibration_errors else 0
+        }
+    
+    def multi_scale_calibration(
+        self,
+        predictions: torch.Tensor,
+        uncertainties: torch.Tensor,
+        targets: torch.Tensor,
+        scales: List[int] = [1, 2, 4, 8]
+    ) -> Dict[str, Dict[str, float]]:
+        """Analyze calibration at multiple spatial scales.
+        
+        Args:
+            predictions: Model predictions [batch, channels, height, width]
+            uncertainties: Predicted uncertainties
+            targets: Ground truth targets
+            scales: List of downsampling scales
+            
+        Returns:
+            Dictionary with scale-wise calibration metrics
+        """
+        scale_metrics = {}
+        
+        for scale in scales:
+            if scale == 1:
+                # Original scale
+                scale_pred, scale_unc, scale_target = predictions, uncertainties, targets
+            else:
+                # Downsample
+                scale_pred = F.avg_pool2d(predictions, kernel_size=scale, stride=scale)
+                scale_unc = F.avg_pool2d(uncertainties, kernel_size=scale, stride=scale)
+                scale_target = F.avg_pool2d(targets, kernel_size=scale, stride=scale)
+            
+            # Compute calibration at this scale
+            ece = self.expected_calibration_error(scale_pred, scale_unc, scale_target)
+            coverage = self.prediction_interval_coverage_probability(
+                scale_pred, scale_unc, scale_target, [0.1]
+            )['picp_90']
+            
+            scale_metrics[f'scale_{scale}'] = {
+                'ece': ece,
+                'coverage_90': coverage,
+                'spatial_resolution': f"{scale_pred.shape[-2]}x{scale_pred.shape[-1]}"
+            }
+        
+        return scale_metrics
+    
+    def comprehensive_uncertainty_report(
+        self,
+        predictions: torch.Tensor,
+        uncertainties: torch.Tensor,
+        targets: torch.Tensor,
+        aleatoric_uncertainty: Optional[torch.Tensor] = None,
+        epistemic_uncertainty: Optional[torch.Tensor] = None,
+        save_path: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Generate comprehensive uncertainty quality report.
+        
+        Args:
+            predictions: Model predictions
+            uncertainties: Total predicted uncertainties
+            targets: Ground truth targets
+            aleatoric_uncertainty: Aleatoric uncertainty component
+            epistemic_uncertainty: Epistemic uncertainty component
+            save_path: Path to save report
+            
+        Returns:
+            Comprehensive metrics dictionary
+        """
+        report = {}
+        
+        # Basic calibration metrics
+        report['calibration'] = {
+            'ece': self.expected_calibration_error(predictions, uncertainties, targets),
+            'ace': self.adaptive_calibration_error(predictions, uncertainties, targets),
+            'mce': self.miscalibration_area(predictions, uncertainties, targets)
+        }
+        
+        # Coverage and interval metrics
+        report['coverage'] = self.prediction_interval_coverage_probability(
+            predictions, uncertainties, targets
+        )
+        
+        # Quality indices
+        report['quality'] = {
+            'uqi': self.uncertainty_quality_index(predictions, uncertainties, targets),
+            'sharpness': self.sharpness(uncertainties),
+            'nll': self.negative_log_likelihood(predictions, uncertainties, targets)
+        }
+        
+        # Uncertainty decomposition (if available)
+        if aleatoric_uncertainty is not None and epistemic_uncertainty is not None:
+            report['decomposition'] = self.uncertainty_decomposition_metrics(
+                aleatoric_uncertainty, epistemic_uncertainty, uncertainties
+            )
+        
+        # Frequency domain analysis (if spatial data)
+        if len(predictions.shape) >= 3:
+            try:
+                report['frequency'] = self.frequency_domain_calibration(
+                    predictions, uncertainties, targets
+                )
+            except Exception as e:
+                warnings.warn(f"Frequency domain analysis failed: {e}")
+        
+        # Save report if requested
+        if save_path:
+            torch.save(report, save_path)
+        
+        return report
