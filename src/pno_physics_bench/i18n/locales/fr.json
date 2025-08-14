@@ -1,0 +1,136 @@
+{
+  "errors": {
+    "model": {
+      "invalid_input_dim": "Dimension d'entrée invalide: {input_dim}. Doit être un entier positif.",
+      "invalid_hidden_dim": "Dimension cachée invalide: {hidden_dim}. Doit être un entier positif.",
+      "invalid_modes": "Modes invalides: {modes}. Doit être un entier positif.",
+      "forward_failed": "Échec du passage avant: {error_msg}",
+      "uncertainty_estimation_failed": "Échec de l'estimation d'incertitude: {error_msg}",
+      "nan_in_predictions": "Valeurs NaN détectées dans les prédictions du modèle",
+      "inf_in_uncertainties": "Valeurs infinies détectées dans les incertitudes"
+    },
+    "training": {
+      "invalid_learning_rate": "Taux d'apprentissage invalide: {lr}. Doit être positif.",
+      "invalid_batch_size": "Taille de lot invalide: {batch_size}. Doit être un entier positif.",
+      "convergence_failed": "Échec de convergence d'entraînement après {epochs} époques",
+      "gradient_explosion": "Explosion de gradient détectée. Considérez réduire le taux d'apprentissage.",
+      "loss_nan": "La perte est devenue NaN pendant l'entraînement à l'étape {step}",
+      "checkpoint_save_failed": "Échec de sauvegarde du checkpoint: {error_msg}",
+      "checkpoint_load_failed": "Échec de chargement du checkpoint: {error_msg}"
+    },
+    "data": {
+      "invalid_dataset_path": "Chemin de dataset invalide: {path}",
+      "corrupt_data": "Données corrompues détectées dans le fichier: {filename}",
+      "incompatible_shapes": "Formes de données incompatibles: attendu {expected}, obtenu {actual}",
+      "missing_required_field": "Champ requis manquant: {field_name}",
+      "invalid_resolution": "Résolution invalide: {resolution}. Doit être une puissance de 2."
+    },
+    "uncertainty": {
+      "negative_uncertainty": "Valeurs d'incertitude négatives détectées",
+      "zero_uncertainty": "Incertitude zéro détectée. Cela peut indiquer une surconfiance du modèle.",
+      "calibration_failed": "Échec de calibration d'incertitude: {error_msg}",
+      "sampling_failed": "Échec d'échantillonnage d'incertitude: {error_msg}",
+      "aggregation_failed": "Échec d'agrégation d'incertitude multi-modèle: {error_msg}"
+    },
+    "physics": {
+      "invalid_reynolds_number": "Nombre de Reynolds invalide: {re_num}. Doit être positif.",
+      "invalid_boundary_conditions": "Conditions aux limites invalides: {bc_type}",
+      "physics_loss_diverged": "La perte physique a divergé. Vérifiez les paramètres PDE.",
+      "conservation_violation": "Violation de loi de conservation détectée: {violation_type}"
+    },
+    "performance": {
+      "out_of_memory": "Erreur de mémoire insuffisante. Considérez réduire la taille du lot ou du modèle.",
+      "cuda_error": "Erreur CUDA survenue: {cuda_error}",
+      "compilation_failed": "Échec de compilation du modèle: {error_msg}",
+      "kernel_launch_failed": "Échec de lancement du kernel GPU: {error_msg}"
+    }
+  },
+  "warnings": {
+    "model": {
+      "large_model_size": "Taille de modèle importante détectée ({size:.1f}MB). Considérez utiliser le gradient checkpointing.",
+      "deprecated_parameter": "Paramètre '{param_name}' est obsolète. Utilisez '{new_param}' à la place.",
+      "suboptimal_precision": "Utiliser la précision {precision} peut affecter la qualité d'incertitude."
+    },
+    "training": {
+      "slow_convergence": "Convergence lente détectée. Considérez ajuster le taux d'apprentissage.",
+      "validation_plateau": "Perte de validation a stagné pendant {steps} étapes.",
+      "overfitting_detected": "Surapprentissage potentiel: perte de validation en augmentation.",
+      "high_uncertainty": "Incertitude moyenne élevée ({uncertainty:.3f}) détectée."
+    },
+    "data": {
+      "imbalanced_dataset": "Dataset semble déséquilibré entre les types de PDE.",
+      "low_resolution_data": "Données basse résolution peuvent affecter la précision du modèle.",
+      "missing_validation_data": "Aucune donnée de validation fournie. Utilisation de la division train/val."
+    }
+  },
+  "info": {
+    "model": {
+      "initialization_complete": "Initialisation du modèle terminée. Paramètres: {param_count:,}",
+      "forward_pass_complete": "Passage avant terminé. Forme: {output_shape}",
+      "uncertainty_stats": "Statistiques d'incertitude - Moyenne: {mean:.4f}, Écart-type: {std:.4f}",
+      "calibration_score": "Score de calibration d'incertitude: {score:.3f}"
+    },
+    "training": {
+      "epoch_complete": "Époque {epoch}/{total_epochs} - Perte: {loss:.6f}, Temps: {time:.2f}s",
+      "best_model_updated": "Meilleur modèle mis à jour à l'époque {epoch} avec perte {loss:.6f}",
+      "training_complete": "Entraînement terminé avec succès en {duration:.2f} minutes",
+      "checkpoint_saved": "Checkpoint sauvegardé dans {path}"
+    },
+    "research": {
+      "hierarchical_decomposition": "Décomposition hiérarchique d'incertitude terminée",
+      "multi_fidelity_fusion": "Fusion d'incertitude multi-fidélité terminée",
+      "spectral_analysis_complete": "Analyse spectrale d'incertitude terminée",
+      "adaptive_computation": "Routage de calcul adaptatif activé"
+    },
+    "performance": {
+      "memory_usage": "Utilisation mémoire actuelle: {memory_mb:.1f} MB",
+      "inference_speed": "Vitesse d'inférence: {samples_per_sec:.1f} échantillons/seconde",
+      "optimization_applied": "Optimisation de performance '{opt_name}' appliquée avec succès"
+    }
+  },
+  "ui": {
+    "buttons": {
+      "train": "Entraîner Modèle",
+      "evaluate": "Évaluer",
+      "save": "Sauvegarder",
+      "load": "Charger",
+      "export": "Exporter",
+      "cancel": "Annuler",
+      "continue": "Continuer",
+      "reset": "Réinitialiser"
+    },
+    "labels": {
+      "model_type": "Type de Modèle",
+      "learning_rate": "Taux d'Apprentissage",
+      "batch_size": "Taille de Lot",
+      "epochs": "Époques",
+      "uncertainty_type": "Type d'Incertitude",
+      "physics_constraint": "Contrainte Physique",
+      "performance_mode": "Mode de Performance"
+    },
+    "tooltips": {
+      "learning_rate": "Contrôle la rapidité d'apprentissage du modèle. Commencez avec 1e-3.",
+      "uncertainty_type": "Type de quantification d'incertitude à utiliser.",
+      "physics_constraint": "Contraintes physique-informées à appliquer pendant l'entraînement."
+    },
+    "tabs": {
+      "training": "Entraînement",
+      "evaluation": "Évaluation",
+      "uncertainty": "Analyse d'Incertitude",
+      "performance": "Performance",
+      "settings": "Paramètres"
+    }
+  },
+  "compliance": {
+    "gdpr": {
+      "data_usage": "Ce modèle traite uniquement des données numériques PDE. Aucune donnée personnelle n'est collectée.",
+      "consent_required": "Consentement utilisateur requis pour le partage des données d'incertitude",
+      "right_to_explanation": "Les estimations d'incertitude sont basées sur la variance d'ensemble et les métriques de calibration"
+    },
+    "audit": {
+      "model_provenance": "Modèle entraîné sur {dataset_name} avec {training_samples:,} échantillons",
+      "uncertainty_methodology": "Incertitude quantifiée avec {method} et intervalles de confiance à {confidence_level}%",
+      "validation_results": "Résultats de validation du modèle RMSE: {rmse:.6f}, Calibration: {calibration:.3f}"
+    }
+  }
+}

@@ -1,0 +1,136 @@
+{
+  "errors": {
+    "model": {
+      "invalid_input_dim": "Invalid input dimension: {input_dim}. Must be positive integer.",
+      "invalid_hidden_dim": "Invalid hidden dimension: {hidden_dim}. Must be positive integer.",
+      "invalid_modes": "Invalid modes: {modes}. Must be positive integer.",
+      "forward_failed": "Forward pass failed: {error_msg}",
+      "uncertainty_estimation_failed": "Uncertainty estimation failed: {error_msg}",
+      "nan_in_predictions": "NaN values detected in model predictions",
+      "inf_in_uncertainties": "Infinite values detected in uncertainties"
+    },
+    "training": {
+      "invalid_learning_rate": "Invalid learning rate: {lr}. Must be positive.",
+      "invalid_batch_size": "Invalid batch size: {batch_size}. Must be positive integer.",
+      "convergence_failed": "Training convergence failed after {epochs} epochs",
+      "gradient_explosion": "Gradient explosion detected. Consider reducing learning rate.",
+      "loss_nan": "Loss became NaN during training at step {step}",
+      "checkpoint_save_failed": "Failed to save checkpoint: {error_msg}",
+      "checkpoint_load_failed": "Failed to load checkpoint: {error_msg}"
+    },
+    "data": {
+      "invalid_dataset_path": "Invalid dataset path: {path}",
+      "corrupt_data": "Corrupted data detected in file: {filename}",
+      "incompatible_shapes": "Incompatible data shapes: expected {expected}, got {actual}",
+      "missing_required_field": "Missing required field: {field_name}",
+      "invalid_resolution": "Invalid resolution: {resolution}. Must be power of 2."
+    },
+    "uncertainty": {
+      "negative_uncertainty": "Negative uncertainty values detected",
+      "zero_uncertainty": "Zero uncertainty detected. This may indicate model overconfidence.",
+      "calibration_failed": "Uncertainty calibration failed: {error_msg}",
+      "sampling_failed": "Uncertainty sampling failed: {error_msg}",
+      "aggregation_failed": "Multi-model uncertainty aggregation failed: {error_msg}"
+    },
+    "physics": {
+      "invalid_reynolds_number": "Invalid Reynolds number: {re_num}. Must be positive.",
+      "invalid_boundary_conditions": "Invalid boundary conditions: {bc_type}",
+      "physics_loss_diverged": "Physics loss diverged. Check PDE parameters.",
+      "conservation_violation": "Conservation law violation detected: {violation_type}"
+    },
+    "performance": {
+      "out_of_memory": "Out of memory error. Consider reducing batch size or model size.",
+      "cuda_error": "CUDA error occurred: {cuda_error}",
+      "compilation_failed": "Model compilation failed: {error_msg}",
+      "kernel_launch_failed": "GPU kernel launch failed: {error_msg}"
+    }
+  },
+  "warnings": {
+    "model": {
+      "large_model_size": "Large model size detected ({size:.1f}MB). Consider using gradient checkpointing.",
+      "deprecated_parameter": "Parameter '{param_name}' is deprecated. Use '{new_param}' instead.",
+      "suboptimal_precision": "Using {precision} precision may affect uncertainty quality."
+    },
+    "training": {
+      "slow_convergence": "Slow convergence detected. Consider adjusting learning rate.",
+      "validation_plateau": "Validation loss plateaued for {steps} steps.",
+      "overfitting_detected": "Potential overfitting: validation loss increasing.",
+      "high_uncertainty": "High average uncertainty ({uncertainty:.3f}) detected."
+    },
+    "data": {
+      "imbalanced_dataset": "Dataset appears imbalanced across PDE types.",
+      "low_resolution_data": "Low resolution data may affect model accuracy.",
+      "missing_validation_data": "No validation data provided. Using train/val split."
+    }
+  },
+  "info": {
+    "model": {
+      "initialization_complete": "Model initialization complete. Parameters: {param_count:,}",
+      "forward_pass_complete": "Forward pass complete. Shape: {output_shape}",
+      "uncertainty_stats": "Uncertainty statistics - Mean: {mean:.4f}, Std: {std:.4f}",
+      "calibration_score": "Uncertainty calibration score: {score:.3f}"
+    },
+    "training": {
+      "epoch_complete": "Epoch {epoch}/{total_epochs} - Loss: {loss:.6f}, Time: {time:.2f}s",
+      "best_model_updated": "Best model updated at epoch {epoch} with loss {loss:.6f}",
+      "training_complete": "Training completed successfully in {duration:.2f} minutes",
+      "checkpoint_saved": "Checkpoint saved to {path}"
+    },
+    "research": {
+      "hierarchical_decomposition": "Hierarchical uncertainty decomposition complete",
+      "multi_fidelity_fusion": "Multi-fidelity uncertainty fusion complete",
+      "spectral_analysis_complete": "Spectral uncertainty analysis complete",
+      "adaptive_computation": "Adaptive computation routing activated"
+    },
+    "performance": {
+      "memory_usage": "Current memory usage: {memory_mb:.1f} MB",
+      "inference_speed": "Inference speed: {samples_per_sec:.1f} samples/second",
+      "optimization_applied": "Performance optimization '{opt_name}' applied successfully"
+    }
+  },
+  "ui": {
+    "buttons": {
+      "train": "Train Model",
+      "evaluate": "Evaluate",
+      "save": "Save",
+      "load": "Load",
+      "export": "Export",
+      "cancel": "Cancel",
+      "continue": "Continue",
+      "reset": "Reset"
+    },
+    "labels": {
+      "model_type": "Model Type",
+      "learning_rate": "Learning Rate", 
+      "batch_size": "Batch Size",
+      "epochs": "Epochs",
+      "uncertainty_type": "Uncertainty Type",
+      "physics_constraint": "Physics Constraint",
+      "performance_mode": "Performance Mode"
+    },
+    "tooltips": {
+      "learning_rate": "Controls how quickly the model learns. Start with 1e-3.",
+      "uncertainty_type": "Type of uncertainty quantification to use.",
+      "physics_constraint": "Physics-informed constraints to enforce during training."
+    },
+    "tabs": {
+      "training": "Training",
+      "evaluation": "Evaluation", 
+      "uncertainty": "Uncertainty Analysis",
+      "performance": "Performance",
+      "settings": "Settings"
+    }
+  },
+  "compliance": {
+    "gdpr": {
+      "data_usage": "This model processes numerical PDE data only. No personal data is collected.",
+      "consent_required": "User consent required for uncertainty data sharing",
+      "right_to_explanation": "Uncertainty estimates are based on ensemble variance and calibration metrics"
+    },
+    "audit": {
+      "model_provenance": "Model trained on {dataset_name} with {training_samples:,} samples",
+      "uncertainty_methodology": "Uncertainty quantified using {method} with {confidence_level}% confidence intervals",
+      "validation_results": "Model validation RMSE: {rmse:.6f}, Calibration: {calibration:.3f}"
+    }
+  }
+}
