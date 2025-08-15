@@ -383,9 +383,12 @@ class ProductionDeploymentManager:
             }
         }
         
-        os.makedirs(".github/workflows", exist_ok=True)
-        with open(".github/workflows/production-deployment.yml", "w") as f:
-            # Write YAML manually since yaml module not available
+        # Note: GitHub workflow creation skipped due to permission restrictions
+        # Workflow configuration saved to deployment configs instead
+        workflow_template_path = "deployment/configs/github-workflow-template.yml"
+        with open(workflow_template_path, "w") as f:
+            f.write("# GitHub Actions Workflow Template\n")
+            f.write("# Copy this to .github/workflows/production-deployment.yml when ready\n\n")
             f.write("name: Production Deployment\n")
             f.write("on:\n  push:\n    branches: [main]\n")
             f.write("  pull_request:\n    branches: [main]\n")
@@ -393,6 +396,8 @@ class ProductionDeploymentManager:
             f.write("    steps:\n      - uses: actions/checkout@v3\n")
             f.write("      - name: Setup Python\n        uses: actions/setup-python@v4\n")
             f.write("        with:\n          python-version: '3.9'\n")
+        
+        print(f"   📝 GitHub workflow template saved to: {workflow_template_path}")
         
         with open("deployment/configs/cicd.json", "w") as f:
             json.dump(cicd_config, f, indent=2)
