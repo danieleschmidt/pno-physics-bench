@@ -1,0 +1,42 @@
+{
+  "regulatory_compliance": {
+    "gdpr": {
+      "enabled": true,
+      "data_retention_days": 2555,
+      "right_to_deletion": true,
+      "data_portability": true,
+      "consent_management": true
+    },
+    "hipaa": {
+      "enabled": true,
+      "access_logging": true,
+      "encryption_required": true,
+      "audit_trail": true
+    },
+    "soc2": {
+      "enabled": true,
+      "security_monitoring": true,
+      "availability_monitoring": true,
+      "confidentiality_controls": true
+    }
+  },
+  "audit_logging": {
+    "enabled": true,
+    "log_retention": "7_years",
+    "tamper_proof": true,
+    "real_time_monitoring": true,
+    "log_categories": [
+      "authentication",
+      "authorization",
+      "data_access",
+      "configuration_changes",
+      "system_events"
+    ]
+  },
+  "data_governance": {
+    "data_classification": true,
+    "access_controls": "role_based",
+    "data_lineage_tracking": true,
+    "privacy_impact_assessments": true
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "network_security": {
+    "network_policies": true,
+    "pod_security_policies": true,
+    "ingress_whitelist": [
+      "trusted-cidrs"
+    ],
+    "egress_restrictions": true
+  },
+  "container_security": {
+    "image_scanning": true,
+    "vulnerability_assessment": true,
+    "runtime_security": true,
+    "non_root_containers": true,
+    "read_only_file_systems": true
+  },
+  "authentication": {
+    "rbac_enabled": true,
+    "service_accounts": "least-privilege",
+    "api_authentication": "jwt-tokens",
+    "mfa_required": true
+  },
+  "encryption": {
+    "data_at_rest": true,
+    "data_in_transit": true,
+    "key_management": "aws-kms",
+    "certificate_management": "cert-manager"
+  },
+  "compliance": {
+    "gdpr_compliant": true,
+    "hipaa_compliant": true,
+    "soc2_compliant": true,
+    "audit_logging": true
+  }
+}

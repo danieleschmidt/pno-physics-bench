@@ -1,0 +1,57 @@
+{
+  "metrics": {
+    "prometheus": {
+      "enabled": true,
+      "retention": "30d",
+      "scrape_interval": "15s",
+      "evaluation_interval": "15s"
+    },
+    "custom_metrics": [
+      "pno_training_loss",
+      "pno_uncertainty_quality",
+      "pno_inference_latency",
+      "pno_model_accuracy"
+    ]
+  },
+  "logging": {
+    "elasticsearch": {
+      "enabled": true,
+      "retention": "90d",
+      "index_rotation": "daily"
+    },
+    "log_levels": {
+      "production": "INFO",
+      "debug": "DEBUG"
+    }
+  },
+  "alerting": {
+    "alertmanager": {
+      "enabled": true,
+      "notification_channels": [
+        "slack",
+        "email",
+        "pagerduty"
+      ]
+    },
+    "alert_rules": [
+      {
+        "name": "high_error_rate",
+        "condition": "error_rate > 5%",
+        "severity": "warning",
+        "duration": "5m"
+      },
+      {
+        "name": "model_accuracy_degradation",
+        "condition": "accuracy < 90%",
+        "severity": "critical",
+        "duration": "2m"
+      }
+    ]
+  },
+  "tracing": {
+    "jaeger": {
+      "enabled": true,
+      "sampling_rate": 0.1
+    }
+  }
+}
