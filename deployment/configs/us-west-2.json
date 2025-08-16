@@ -1,0 +1,24 @@
+{
+  "name": "US West (Oregon)",
+  "primary": true,
+  "availability_zones": [
+    "us-west-2a",
+    "us-west-2b",
+    "us-west-2c"
+  ],
+  "compute": {
+    "instance_types": [
+      "c5.2xlarge",
+      "c5.4xlarge"
+    ],
+    "min_instances": 3,
+    "max_instances": 50,
+    "target_cpu_utilization": 70
+  },
+  "storage": {
+    "type": "ssd",
+    "size": "100Gi",
+    "backup_enabled": true,
+    "encryption": true
+  }
+}

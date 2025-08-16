@@ -1,0 +1,152 @@
+{
+  "timestamp": 1755301082.448566,
+  "overall_score": 100.0,
+  "passed_gates": 7,
+  "total_gates": 7,
+  "gate_results": {
+    "Code Structure": {
+      "passed": true,
+      "score": 1.0,
+      "weight": 1.0,
+      "execution_time": 4.553794860839844e-05,
+      "details": {
+        "missing_files": [],
+        "total_required": 6,
+        "found_files": 6
+      }
+    },
+    "Syntax Validation": {
+      "passed": true,
+      "score": 1.0,
+      "weight": 1.0,
+      "execution_time": 0.3073253631591797,
+      "details": {
+        "total_files": 65,
+        "valid_files": 65,
+        "syntax_errors": []
+      }
+    },
+    "Security Scan": {
+      "passed": true,
+      "score": 1.0,
+      "weight": 1.5,
+      "execution_time": 0.09558796882629395,
+      "details": {
+        "total_violations": 26,
+        "violations_by_type": {
+          "unsafe_eval": [
+            "src/pno_physics_bench/benchmarks.py:271",
+            "src/pno_physics_bench/benchmarks.py:292",
+            "src/pno_physics_bench/cli.py:285",
+            "src/pno_physics_bench/models.py:313",
+            "src/pno_physics_bench/optimization.py:92",
+            "src/pno_physics_bench/optimization.py:167",
+            "src/pno_physics_bench/optimization.py:541",
+            "src/pno_physics_bench/optimization.py:602",
+            "src/pno_physics_bench/optimization_engine.py:198",
+            "src/pno_physics_bench/optimization_engine.py:431",
+            "src/pno_physics_bench/performance_optimization.py:597",
+            "src/pno_physics_bench/quantum_enhanced_pno.py:322",
+            "src/pno_physics_bench/uncertainty.py:41",
+            "src/pno_physics_bench/uncertainty.py:107",
+            "src/pno_physics_bench/uncertainty.py:173",
+            "src/pno_physics_bench/uncertainty.py:360",
+            "src/pno_physics_bench/monitoring/advanced_health_checks.py:424",
+            "src/pno_physics_bench/research/multi_fidelity.py:234",
+            "src/pno_physics_bench/research/performance_optimizers.py:909",
+            "src/pno_physics_bench/research/performance_optimizers.py:910",
+            "src/pno_physics_bench/training/callbacks.py:238",
+            "src/pno_physics_bench/training/trainer.py:316",
+            "src/pno_physics_bench/training/trainer.py:498",
+            "src/pno_physics_bench/uncertainty/ensemble_methods.py:33",
+            "src/pno_physics_bench/uncertainty/ensemble_methods.py:404",
+            "src/pno_physics_bench/utils/profiling.py:134"
+          ]
+        }
+      }
+    },
+    "Model Validation": {
+      "passed": true,
+      "score": 1.0,
+      "weight": 1.5,
+      "execution_time": 0.00013184547424316406,
+      "details": {
+        "found_classes": [
+          "ProbabilisticNeuralOperator",
+          "FourierNeuralOperator",
+          "SpectralConv2d_Probabilistic",
+          "DeepONet"
+        ],
+        "missing_classes": [],
+        "found_methods": [
+          "predict_with_uncertainty",
+          "kl_divergence",
+          "forward"
+        ],
+        "class_coverage": 1.0,
+        "method_coverage": 1.0
+      }
+    },
+    "Documentation": {
+      "passed": true,
+      "score": 1.0,
+      "weight": 0.8,
+      "execution_time": 0.0031774044036865234,
+      "details": {
+        "found_docs": [
+          "README.md",
+          "ARCHITECTURE.md",
+          "CONTRIBUTING.md",
+          "SECURITY.md",
+          "CHANGELOG.md"
+        ],
+        "missing_docs": [],
+        "doc_coverage": 1.0,
+        "docstring_coverage": 1.0
+      }
+    },
+    "Performance": {
+      "passed": true,
+      "score": 1.0,
+      "weight": 1.2,
+      "execution_time": 0.00116729736328125,
+      "details": {
+        "found_perf_files": [
+          "src/pno_physics_bench/optimization.py",
+          "src/pno_physics_bench/performance_optimization.py",
+          "src/pno_physics_bench/scaling/performance_optimization.py",
+          "src/pno_physics_bench/scaling/intelligent_caching.py"
+        ],
+        "perf_file_coverage": 1.0,
+        "computation_time": 0.0010883808135986328,
+        "has_performance_config": true,
+        "benchmark_result": 333283335000
+      }
+    },
+    "Deployment Readiness": {
+      "passed": true,
+      "score": 1.0,
+      "weight": 1.3,
+      "execution_time": 8.654594421386719e-05,
+      "details": {
+        "found_files": [
+          "Dockerfile",
+          "docker-compose.yml",
+          "pyproject.toml",
+          "requirements.txt"
+        ],
+        "found_dirs": [
+          "deployment/",
+          "monitoring/"
+        ],
+        "env_configs": [
+          "kubernetes.yaml",
+          "production.json"
+        ],
+        "has_monitoring": true,
+        "deployment_score": 0.9999999999999999
+      }
+    }
+  },
+  "recommendations": []
+}

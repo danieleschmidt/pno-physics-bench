@@ -1,0 +1,34 @@
+{
+  "deployment": {
+    "environment": "production",
+    "version": "1.0.0",
+    "build_timestamp": 1755301179.5379567,
+    "multi_region": true,
+    "high_availability": true
+  },
+  "regions": {
+    "primary": "us-west-2",
+    "secondary": [
+      "us-east-1",
+      "eu-west-1",
+      "ap-southeast-1"
+    ],
+    "failover_regions": [
+      "us-central-1",
+      "eu-central-1"
+    ]
+  },
+  "infrastructure": {
+    "container_platform": "kubernetes",
+    "orchestration": "kubernetes",
+    "service_mesh": "istio",
+    "ingress": "nginx-ingress",
+    "storage": "persistent-volumes"
+  },
+  "networking": {
+    "load_balancer": "application-load-balancer",
+    "cdn": "cloudflare",
+    "dns": "route53",
+    "ssl_termination": "load-balancer"
+  }
+}

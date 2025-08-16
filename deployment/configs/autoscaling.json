@@ -1,0 +1,40 @@
+{
+  "horizontal_pod_autoscaler": {
+    "enabled": true,
+    "min_replicas": 3,
+    "max_replicas": 100,
+    "target_cpu_utilization": 70,
+    "target_memory_utilization": 80,
+    "scale_up_stabilization": "60s",
+    "scale_down_stabilization": "300s"
+  },
+  "vertical_pod_autoscaler": {
+    "enabled": true,
+    "update_mode": "Auto",
+    "resource_policy": {
+      "cpu": {
+        "max": "4",
+        "min": "100m"
+      },
+      "memory": {
+        "max": "8Gi",
+        "min": "512Mi"
+      }
+    }
+  },
+  "cluster_autoscaler": {
+    "enabled": true,
+    "min_nodes": 3,
+    "max_nodes": 50,
+    "scale_down_delay": "10m",
+    "scale_down_utilization_threshold": 0.5
+  },
+  "custom_metrics": {
+    "queue_length_scaling": {
+      "metric": "prediction_queue_length",
+      "target_value": 100,
+      "scale_up_threshold": 150,
+      "scale_down_threshold": 50
+    }
+  }
+}
