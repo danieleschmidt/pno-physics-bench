@@ -1,0 +1,14 @@
+{
+  "environment": "production",
+  "replicas": 3,
+  "cpu_limit": "2000m",
+  "memory_limit": "4Gi",
+  "gpu_limit": 1,
+  "storage_size": "20Gi",
+  "redis_enabled": true,
+  "monitoring_enabled": true,
+  "security_enabled": true,
+  "auto_scaling": true,
+  "max_replicas": 10,
+  "min_replicas": 2
+}
