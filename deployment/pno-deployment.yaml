@@ -1,0 +1,141 @@
+{
+  "apiVersion": "apps/v1",
+  "kind": "Deployment",
+  "metadata": {
+    "name": "pno-physics-bench",
+    "labels": {
+      "app": "pno-physics-bench",
+      "version": "v1.0.0",
+      "component": "inference-server"
+    }
+  },
+  "spec": {
+    "replicas": 3,
+    "selector": {
+      "matchLabels": {
+        "app": "pno-physics-bench"
+      }
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "app": "pno-physics-bench",
+          "version": "v1.0.0"
+        },
+        "annotations": {
+          "prometheus.io/scrape": "true",
+          "prometheus.io/port": "9090",
+          "prometheus.io/path": "/metrics"
+        }
+      },
+      "spec": {
+        "securityContext": {
+          "runAsNonRoot": true,
+          "runAsUser": 1000,
+          "fsGroup": 1000
+        },
+        "containers": [
+          {
+            "name": "pno-server",
+            "image": "pno-physics-bench:latest",
+            "imagePullPolicy": "Always",
+            "ports": [
+              {
+                "containerPort": 8080,
+                "name": "http"
+              },
+              {
+                "containerPort": 9090,
+                "name": "metrics"
+              }
+            ],
+            "env": [
+              {
+                "name": "ENVIRONMENT",
+                "value": "production"
+              },
+              {
+                "name": "REDIS_ENABLED",
+                "value": "True"
+              },
+              {
+                "name": "MONITORING_ENABLED",
+                "value": "True"
+              },
+              {
+                "name": "CUDA_VISIBLE_DEVICES",
+                "value": "0"
+              }
+            ],
+            "resources": {
+              "requests": {
+                "cpu": "500m",
+                "memory": "2Gi",
+                "nvidia.com/gpu": 1
+              },
+              "limits": {
+                "cpu": "2000m",
+                "memory": "4Gi",
+                "nvidia.com/gpu": 1
+              }
+            },
+            "livenessProbe": {
+              "httpGet": {
+                "path": "/health",
+                "port": 8080
+              },
+              "initialDelaySeconds": 30,
+              "periodSeconds": 10,
+              "timeoutSeconds": 5,
+              "failureThreshold": 3
+            },
+            "readinessProbe": {
+              "httpGet": {
+                "path": "/ready",
+                "port": 8080
+              },
+              "initialDelaySeconds": 15,
+              "periodSeconds": 5,
+              "timeoutSeconds": 3,
+              "failureThreshold": 3
+            },
+            "volumeMounts": [
+              {
+                "name": "model-storage",
+                "mountPath": "/app/models"
+              },
+              {
+                "name": "cache-storage",
+                "mountPath": "/app/cache"
+              }
+            ]
+          }
+        ],
+        "volumes": [
+          {
+            "name": "model-storage",
+            "persistentVolumeClaim": {
+              "claimName": "pno-model-pvc"
+            }
+          },
+          {
+            "name": "cache-storage",
+            "emptyDir": {
+              "sizeLimit": "10Gi"
+            }
+          }
+        ],
+        "nodeSelector": {
+          "accelerator": "nvidia-tesla-v100"
+        },
+        "tolerations": [
+          {
+            "key": "nvidia.com/gpu",
+            "operator": "Exists",
+            "effect": "NoSchedule"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,4 +1,774 @@
-"""Intelligent caching system for PNO operations with adaptive strategies."""
+"""
+Intelligent Caching System for Probabilistic Neural Operators.
+
+This module implements advanced caching strategies including adaptive caching,
+semantic caching, hierarchical cache management, and distributed cache
+coordination for high-performance PNO inference.
+"""
+
+import torch
+import torch.nn as nn
+import numpy as np
+import hashlib
+import pickle
+import time
+import threading
+import queue
+import os
+import json
+import redis
+import sqlite3
+import lz4.frame
+from typing import Dict, List, Tuple, Optional, Any, Union, Callable
+from dataclasses import dataclass, asdict
+from abc import ABC, abstractmethod
+import logging
+from collections import OrderedDict, defaultdict
+import weakref
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import psutil
+
+from ..models import ProbabilisticNeuralOperator
+
+
+@dataclass
+class CacheEntry:
+    """Cache entry with metadata."""
+    key: str
+    value: Any
+    timestamp: float
+    access_count: int
+    size_bytes: int
+    ttl: Optional[float] = None
+    compression_ratio: float = 1.0
+    semantic_hash: Optional[str] = None
+
+
+@dataclass
+class CacheStats:
+    """Cache performance statistics."""
+    hits: int = 0
+    misses: int = 0
+    evictions: int = 0
+    size_bytes: int = 0
+    num_entries: int = 0
+    avg_access_time: float = 0.0
+    compression_ratio: float = 1.0
+    memory_efficiency: float = 0.0
+
+
+class CachePolicy(ABC):
+    """Abstract base class for cache eviction policies."""
+    
+    @abstractmethod
+    def should_evict(self, entry: CacheEntry, current_time: float) -> bool:
+        """Determine if entry should be evicted."""
+        pass
+    
+    @abstractmethod
+    def get_eviction_priority(self, entry: CacheEntry, current_time: float) -> float:
+        """Get eviction priority (higher = more likely to evict)."""
+        pass
+
+
+class LRUPolicy(CachePolicy):
+    """Least Recently Used eviction policy."""
+    
+    def should_evict(self, entry: CacheEntry, current_time: float) -> bool:
+        return True  # LRU always allows eviction
+    
+    def get_eviction_priority(self, entry: CacheEntry, current_time: float) -> float:
+        return current_time - entry.timestamp
+
+
+class LFUPolicy(CachePolicy):
+    """Least Frequently Used eviction policy."""
+    
+    def should_evict(self, entry: CacheEntry, current_time: float) -> bool:
+        return True
+    
+    def get_eviction_priority(self, entry: CacheEntry, current_time: float) -> float:
+        return -entry.access_count  # Negative because lower access count = higher priority
+
+
+class TTLPolicy(CachePolicy):
+    """Time-To-Live eviction policy."""
+    
+    def __init__(self, default_ttl: float = 3600.0):
+        self.default_ttl = default_ttl
+    
+    def should_evict(self, entry: CacheEntry, current_time: float) -> bool:
+        ttl = entry.ttl if entry.ttl is not None else self.default_ttl
+        return current_time - entry.timestamp > ttl
+    
+    def get_eviction_priority(self, entry: CacheEntry, current_time: float) -> float:
+        ttl = entry.ttl if entry.ttl is not None else self.default_ttl
+        time_left = ttl - (current_time - entry.timestamp)
+        return -time_left  # Negative because less time left = higher priority
+
+
+class AdaptivePolicy(CachePolicy):
+    """Adaptive policy that combines multiple strategies."""
+    
+    def __init__(self, weights: Dict[str, float] = None):
+        self.weights = weights or {
+            'recency': 0.4,
+            'frequency': 0.3,
+            'size': 0.2,
+            'semantic': 0.1
+        }
+        self.access_pattern_history = defaultdict(list)
+    
+    def should_evict(self, entry: CacheEntry, current_time: float) -> bool:
+        return True
+    
+    def get_eviction_priority(self, entry: CacheEntry, current_time: float) -> float:
+        # Recency component (LRU-like)
+        recency_score = current_time - entry.timestamp
+        
+        # Frequency component (LFU-like)
+        frequency_score = -entry.access_count
+        
+        # Size component (favor evicting larger entries)
+        size_score = entry.size_bytes
+        
+        # Semantic component (based on access patterns)
+        semantic_score = self._compute_semantic_score(entry)
+        
+        # Weighted combination
+        total_score = (
+            self.weights['recency'] * recency_score +
+            self.weights['frequency'] * frequency_score +
+            self.weights['size'] * size_score +
+            self.weights['semantic'] * semantic_score
+        )
+        
+        return total_score
+    
+    def _compute_semantic_score(self, entry: CacheEntry) -> float:
+        """Compute semantic score based on access patterns."""
+        if entry.semantic_hash not in self.access_pattern_history:
+            return 0.0
+        
+        history = self.access_pattern_history[entry.semantic_hash]
+        if len(history) < 2:
+            return 0.0
+        
+        # Compute access frequency trend
+        recent_accesses = [t for t in history if time.time() - t < 3600]  # Last hour
+        return -len(recent_accesses)  # More recent accesses = lower eviction priority
+
+
+class CompressionEngine:
+    """Data compression engine for cache optimization."""
+    
+    def __init__(self, compression_threshold: int = 1024):
+        self.compression_threshold = compression_threshold
+    
+    def should_compress(self, data: bytes) -> bool:
+        """Determine if data should be compressed."""
+        return len(data) > self.compression_threshold
+    
+    def compress(self, data: bytes) -> Tuple[bytes, float]:
+        """Compress data and return compression ratio."""
+        if not self.should_compress(data):
+            return data, 1.0
+        
+        try:
+            compressed = lz4.frame.compress(data)
+            compression_ratio = len(data) / len(compressed)
+            return compressed, compression_ratio
+        except Exception:
+            return data, 1.0
+    
+    def decompress(self, compressed_data: bytes, compression_ratio: float) -> bytes:
+        """Decompress data."""
+        if compression_ratio <= 1.01:  # Not compressed
+            return compressed_data
+        
+        try:
+            return lz4.frame.decompress(compressed_data)
+        except Exception:
+            return compressed_data
+
+
+class SemanticHasher:
+    """Generate semantic hashes for cache entries."""
+    
+    def __init__(self, similarity_threshold: float = 0.95):
+        self.similarity_threshold = similarity_threshold
+    
+    def compute_tensor_hash(self, tensor: torch.Tensor, precision: int = 3) -> str:
+        """Compute semantic hash for tensor based on statistical properties."""
+        # Use statistical moments for semantic similarity
+        mean = tensor.mean().item()
+        std = tensor.std().item()
+        min_val = tensor.min().item()
+        max_val = tensor.max().item()
+        
+        # Quantize for similarity
+        mean = round(mean, precision)
+        std = round(std, precision)
+        min_val = round(min_val, precision)
+        max_val = round(max_val, precision)
+        
+        # Shape information
+        shape_str = '_'.join(map(str, tensor.shape))
+        
+        # Create semantic signature
+        semantic_data = f"{shape_str}_{mean}_{std}_{min_val}_{max_val}"
+        
+        return hashlib.sha256(semantic_data.encode()).hexdigest()[:16]
+    
+    def compute_input_hash(self, input_data: Dict[str, Any]) -> str:
+        """Compute semantic hash for general input data."""
+        if isinstance(input_data, torch.Tensor):
+            return self.compute_tensor_hash(input_data)
+        
+        # For general data, use serialization
+        try:
+            serialized = json.dumps(input_data, sort_keys=True, default=str)
+            return hashlib.sha256(serialized.encode()).hexdigest()[:16]
+        except:
+            return hashlib.sha256(str(input_data).encode()).hexdigest()[:16]
+
+
+class LocalCache:
+    """Local in-memory cache with intelligent eviction."""
+    
+    def __init__(
+        self,
+        max_size_bytes: int = 1024**3,  # 1GB
+        max_entries: int = 10000,
+        policy: CachePolicy = None,
+        enable_compression: bool = True
+    ):
+        self.max_size_bytes = max_size_bytes
+        self.max_entries = max_entries
+        self.policy = policy or AdaptivePolicy()
+        self.enable_compression = enable_compression
+        
+        # Storage
+        self.cache: OrderedDict[str, CacheEntry] = OrderedDict()
+        self.stats = CacheStats()
+        
+        # Components
+        self.compressor = CompressionEngine()
+        self.semantic_hasher = SemanticHasher()
+        
+        # Thread safety
+        self.lock = threading.RLock()
+        
+        # Background cleanup
+        self.cleanup_thread = threading.Thread(target=self._background_cleanup, daemon=True)
+        self.cleanup_thread.start()
+        
+        # Logging
+        self.logger = logging.getLogger(__name__)
+    
+    def _serialize_value(self, value: Any) -> bytes:
+        """Serialize value for storage."""
+        return pickle.dumps(value)
+    
+    def _deserialize_value(self, data: bytes) -> Any:
+        """Deserialize value from storage."""
+        return pickle.loads(data)
+    
+    def _compute_cache_key(self, key_data: Dict[str, Any]) -> str:
+        """Compute cache key from input data."""
+        serialized = json.dumps(key_data, sort_keys=True, default=str)
+        return hashlib.sha256(serialized.encode()).hexdigest()
+    
+    def _should_evict_entry(self, entry: CacheEntry) -> bool:
+        """Check if entry should be evicted."""
+        current_time = time.time()
+        
+        # Check TTL expiration
+        if isinstance(self.policy, TTLPolicy) or hasattr(self.policy, 'default_ttl'):
+            if self.policy.should_evict(entry, current_time):
+                return True
+        
+        # Check size limits
+        if self.stats.size_bytes > self.max_size_bytes or self.stats.num_entries > self.max_entries:
+            return True
+        
+        return False
+    
+    def _evict_entries(self, target_size: Optional[int] = None):
+        """Evict entries based on policy."""
+        if not self.cache:
+            return
+        
+        current_time = time.time()
+        target_size = target_size or int(self.max_size_bytes * 0.8)  # Evict to 80% capacity
+        
+        # Get eviction candidates
+        candidates = []
+        for key, entry in self.cache.items():
+            if self._should_evict_entry(entry):
+                priority = self.policy.get_eviction_priority(entry, current_time)
+                candidates.append((priority, key, entry))
+        
+        # Sort by eviction priority
+        candidates.sort(reverse=True)
+        
+        # Evict until target size is reached
+        for priority, key, entry in candidates:
+            if self.stats.size_bytes <= target_size and self.stats.num_entries <= self.max_entries:
+                break
+            
+            self._remove_entry(key)
+            self.stats.evictions += 1
+    
+    def _remove_entry(self, key: str):
+        """Remove entry from cache."""
+        if key in self.cache:
+            entry = self.cache[key]
+            del self.cache[key]
+            self.stats.size_bytes -= entry.size_bytes
+            self.stats.num_entries -= 1
+    
+    def _background_cleanup(self):
+        """Background thread for cache cleanup."""
+        while True:
+            try:
+                time.sleep(60)  # Cleanup every minute
+                with self.lock:
+                    self._evict_entries()
+            except Exception as e:
+                self.logger.error(f"Background cleanup error: {e}")
+    
+    def put(
+        self,
+        key_data: Dict[str, Any],
+        value: Any,
+        ttl: Optional[float] = None
+    ) -> str:
+        """Store value in cache."""
+        with self.lock:
+            # Compute cache key
+            cache_key = self._compute_cache_key(key_data)
+            
+            # Serialize value
+            serialized_value = self._serialize_value(value)
+            
+            # Compress if enabled
+            compressed_value = serialized_value
+            compression_ratio = 1.0
+            
+            if self.enable_compression:
+                compressed_value, compression_ratio = self.compressor.compress(serialized_value)
+            
+            # Compute semantic hash
+            semantic_hash = self.semantic_hasher.compute_input_hash(key_data)
+            
+            # Create cache entry
+            entry = CacheEntry(
+                key=cache_key,
+                value=compressed_value,
+                timestamp=time.time(),
+                access_count=0,
+                size_bytes=len(compressed_value),
+                ttl=ttl,
+                compression_ratio=compression_ratio,
+                semantic_hash=semantic_hash
+            )
+            
+            # Remove existing entry if present
+            if cache_key in self.cache:
+                self._remove_entry(cache_key)
+            
+            # Check if we need to evict
+            if (self.stats.size_bytes + entry.size_bytes > self.max_size_bytes or
+                self.stats.num_entries >= self.max_entries):
+                self._evict_entries(self.max_size_bytes - entry.size_bytes)
+            
+            # Add new entry
+            self.cache[cache_key] = entry
+            self.stats.size_bytes += entry.size_bytes
+            self.stats.num_entries += 1
+            
+            self.logger.debug(f"Cached entry: {cache_key[:8]}... (size: {entry.size_bytes} bytes)")
+            
+            return cache_key
+    
+    def get(self, key_data: Dict[str, Any]) -> Tuple[Optional[Any], bool]:
+        """Retrieve value from cache."""
+        with self.lock:
+            start_time = time.time()
+            
+            # Compute cache key
+            cache_key = self._compute_cache_key(key_data)
+            
+            if cache_key not in self.cache:
+                self.stats.misses += 1
+                return None, False
+            
+            entry = self.cache[cache_key]
+            
+            # Check TTL expiration
+            current_time = time.time()
+            if self._should_evict_entry(entry):
+                self._remove_entry(cache_key)
+                self.stats.misses += 1
+                return None, False
+            
+            # Update access statistics
+            entry.access_count += 1
+            entry.timestamp = current_time
+            
+            # Move to end (for LRU behavior)
+            self.cache.move_to_end(cache_key)
+            
+            # Decompress value
+            decompressed_value = entry.value
+            if entry.compression_ratio > 1.01:
+                decompressed_value = self.compressor.decompress(entry.value, entry.compression_ratio)
+            
+            # Deserialize value
+            value = self._deserialize_value(decompressed_value)
+            
+            # Update statistics
+            self.stats.hits += 1
+            access_time = time.time() - start_time
+            self.stats.avg_access_time = (
+                (self.stats.avg_access_time * (self.stats.hits - 1) + access_time) / self.stats.hits
+            )
+            
+            return value, True
+    
+    def get_stats(self) -> CacheStats:
+        """Get cache statistics."""
+        with self.lock:
+            hit_rate = self.stats.hits / (self.stats.hits + self.stats.misses) if (self.stats.hits + self.stats.misses) > 0 else 0.0
+            
+            total_uncompressed_size = sum(
+                entry.size_bytes * entry.compression_ratio
+                for entry in self.cache.values()
+            )
+            
+            compression_ratio = total_uncompressed_size / self.stats.size_bytes if self.stats.size_bytes > 0 else 1.0
+            
+            memory_efficiency = hit_rate * compression_ratio
+            
+            stats = CacheStats(
+                hits=self.stats.hits,
+                misses=self.stats.misses,
+                evictions=self.stats.evictions,
+                size_bytes=self.stats.size_bytes,
+                num_entries=self.stats.num_entries,
+                avg_access_time=self.stats.avg_access_time,
+                compression_ratio=compression_ratio,
+                memory_efficiency=memory_efficiency
+            )
+            
+            return stats
+    
+    def clear(self):
+        """Clear all cache entries."""
+        with self.lock:
+            self.cache.clear()
+            self.stats = CacheStats()
+
+
+class DistributedCache:
+    """Distributed cache using Redis backend."""
+    
+    def __init__(
+        self,
+        redis_config: Dict[str, Any] = None,
+        local_cache: Optional[LocalCache] = None,
+        enable_local_fallback: bool = True
+    ):
+        self.redis_config = redis_config or {
+            'host': 'localhost',
+            'port': 6379,
+            'db': 0,
+            'decode_responses': False
+        }
+        
+        self.local_cache = local_cache
+        self.enable_local_fallback = enable_local_fallback
+        
+        # Initialize Redis connection
+        try:
+            self.redis_client = redis.Redis(**self.redis_config)
+            self.redis_client.ping()  # Test connection
+            self.redis_available = True
+        except Exception as e:
+            self.redis_available = False
+            logging.warning(f"Redis not available: {e}")
+        
+        # Components
+        self.compressor = CompressionEngine()
+        self.semantic_hasher = SemanticHasher()
+        
+        # Statistics
+        self.stats = CacheStats()
+        
+        # Logging
+        self.logger = logging.getLogger(__name__)
+    
+    def _compute_cache_key(self, key_data: Dict[str, Any]) -> str:
+        """Compute cache key from input data."""
+        serialized = json.dumps(key_data, sort_keys=True, default=str)
+        return f"pno_cache:{hashlib.sha256(serialized.encode()).hexdigest()}"
+    
+    def put(
+        self,
+        key_data: Dict[str, Any],
+        value: Any,
+        ttl: Optional[int] = None
+    ) -> str:
+        """Store value in distributed cache."""
+        cache_key = self._compute_cache_key(key_data)
+        
+        # Serialize and compress
+        serialized_value = pickle.dumps(value)
+        compressed_value, compression_ratio = self.compressor.compress(serialized_value)
+        
+        # Store in Redis
+        if self.redis_available:
+            try:
+                # Create metadata
+                metadata = {
+                    'compression_ratio': compression_ratio,
+                    'semantic_hash': self.semantic_hasher.compute_input_hash(key_data),
+                    'timestamp': time.time(),
+                    'size_bytes': len(compressed_value)
+                }
+                
+                # Store data and metadata separately
+                pipe = self.redis_client.pipeline()
+                pipe.set(cache_key, compressed_value, ex=ttl)
+                pipe.set(f"{cache_key}:meta", json.dumps(metadata), ex=ttl)
+                pipe.execute()
+                
+                self.logger.debug(f"Stored in Redis: {cache_key}")
+                
+            except Exception as e:
+                self.logger.error(f"Redis storage failed: {e}")
+                # Fallback to local cache
+                if self.local_cache and self.enable_local_fallback:
+                    return self.local_cache.put(key_data, value, ttl)
+        
+        # Fallback to local cache
+        elif self.local_cache and self.enable_local_fallback:
+            return self.local_cache.put(key_data, value, ttl)
+        
+        return cache_key
+    
+    def get(self, key_data: Dict[str, Any]) -> Tuple[Optional[Any], bool]:
+        """Retrieve value from distributed cache."""
+        cache_key = self._compute_cache_key(key_data)
+        
+        # Try Redis first
+        if self.redis_available:
+            try:
+                # Get data and metadata
+                pipe = self.redis_client.pipeline()
+                pipe.get(cache_key)
+                pipe.get(f"{cache_key}:meta")
+                results = pipe.execute()
+                
+                compressed_value, metadata_str = results
+                
+                if compressed_value is not None and metadata_str is not None:
+                    # Parse metadata
+                    metadata = json.loads(metadata_str)
+                    compression_ratio = metadata.get('compression_ratio', 1.0)
+                    
+                    # Decompress and deserialize
+                    decompressed_value = self.compressor.decompress(compressed_value, compression_ratio)
+                    value = pickle.loads(decompressed_value)
+                    
+                    self.stats.hits += 1
+                    return value, True
+                
+                else:
+                    self.stats.misses += 1
+                    
+            except Exception as e:
+                self.logger.error(f"Redis retrieval failed: {e}")
+        
+        # Fallback to local cache
+        if self.local_cache and self.enable_local_fallback:
+            return self.local_cache.get(key_data)
+        
+        self.stats.misses += 1
+        return None, False
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get distributed cache statistics."""
+        stats = {
+            'local_stats': self.local_cache.get_stats() if self.local_cache else None,
+            'redis_available': self.redis_available,
+            'distributed_hits': self.stats.hits,
+            'distributed_misses': self.stats.misses
+        }
+        
+        if self.redis_available:
+            try:
+                redis_info = self.redis_client.info('memory')
+                stats['redis_memory'] = {
+                    'used_memory': redis_info.get('used_memory', 0),
+                    'used_memory_human': redis_info.get('used_memory_human', '0B'),
+                    'maxmemory': redis_info.get('maxmemory', 0)
+                }
+            except Exception:
+                pass
+        
+        return stats
+
+
+class CachedPNOInference:
+    """PNO inference with intelligent caching."""
+    
+    def __init__(
+        self,
+        model: ProbabilisticNeuralOperator,
+        cache_system: Union[LocalCache, DistributedCache],
+        similarity_threshold: float = 0.95,
+        enable_semantic_caching: bool = True
+    ):
+        self.model = model
+        self.cache_system = cache_system
+        self.similarity_threshold = similarity_threshold
+        self.enable_semantic_caching = enable_semantic_caching
+        
+        # Semantic hasher for input similarity
+        self.semantic_hasher = SemanticHasher(similarity_threshold)
+        
+        # Performance tracking
+        self.inference_stats = {
+            'cache_hits': 0,
+            'cache_misses': 0,
+            'semantic_hits': 0,
+            'total_inference_time': 0.0,
+            'total_cache_time': 0.0
+        }
+        
+        # Logging
+        self.logger = logging.getLogger(__name__)
+    
+    def predict_with_uncertainty(
+        self,
+        input_tensor: torch.Tensor,
+        num_samples: int = 100,
+        use_cache: bool = True
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Predict with uncertainty using intelligent caching."""
+        cache_start_time = time.time()
+        
+        if use_cache:
+            # Compute cache key features
+            input_features = {
+                'shape': list(input_tensor.shape),
+                'dtype': str(input_tensor.dtype),
+                'device': str(input_tensor.device),
+                'semantic_hash': self.semantic_hasher.compute_tensor_hash(input_tensor),
+                'num_samples': num_samples,
+                'model_hash': 'model_v1'
+            }
+            
+            # Check cache
+            cached_result, cache_hit = self.cache_system.get(input_features)
+            
+            if cache_hit:
+                self.inference_stats['cache_hits'] += 1
+                self.inference_stats['total_cache_time'] += time.time() - cache_start_time
+                self.logger.debug("Cache hit - returning cached result")
+                return cached_result
+        
+        cache_time = time.time() - cache_start_time
+        self.inference_stats['total_cache_time'] += cache_time
+        
+        # Cache miss - run inference
+        inference_start_time = time.time()
+        
+        with torch.no_grad():
+            prediction, uncertainty = self.model.predict_with_uncertainty(
+                input_tensor, num_samples=num_samples
+            )
+        
+        inference_time = time.time() - inference_start_time
+        self.inference_stats['total_inference_time'] += inference_time
+        
+        # Store result in cache
+        if use_cache:
+            result = (prediction, uncertainty)
+            
+            # Calculate TTL based on result stability
+            ttl = self._compute_adaptive_ttl(uncertainty, inference_time)
+            
+            self.cache_system.put(input_features, result, ttl=ttl)
+            
+            self.inference_stats['cache_misses'] += 1
+            self.logger.debug(f"Inference completed in {inference_time:.3f}s, cached with TTL {ttl}s")
+        
+        return prediction, uncertainty
+    
+    def _compute_adaptive_ttl(self, uncertainty: torch.Tensor, inference_time: float) -> int:
+        """Compute adaptive TTL based on uncertainty and computation cost."""
+        base_ttl = 3600  # 1 hour
+        uncertainty_factor = 1.0 / (uncertainty.mean().item() + 0.1)
+        cost_factor = min(10.0, inference_time / 0.1)
+        adaptive_ttl = int(base_ttl * uncertainty_factor * cost_factor)
+        return max(300, min(86400, adaptive_ttl))  # 5 minutes to 24 hours
+    
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """Get comprehensive performance statistics."""
+        total_requests = self.inference_stats['cache_hits'] + self.inference_stats['cache_misses']
+        
+        cache_hit_rate = (
+            self.inference_stats['cache_hits'] / total_requests
+            if total_requests > 0 else 0.0
+        )
+        
+        return {
+            'cache_performance': {
+                'hit_rate': cache_hit_rate,
+                'total_requests': total_requests,
+                'cache_hits': self.inference_stats['cache_hits'],
+                'cache_misses': self.inference_stats['cache_misses']
+            },
+            'cache_system_stats': self.cache_system.get_stats()
+        }
+
+
+def create_intelligent_caching_example():
+    """Create example intelligent caching setup."""
+    from ..models import ProbabilisticNeuralOperator
+    
+    # Create model
+    model = ProbabilisticNeuralOperator(
+        input_dim=3,
+        hidden_dim=128,
+        num_layers=4,
+        modes=16
+    )
+    
+    # Create cache
+    cache = LocalCache(
+        max_size_bytes=512 * 1024 * 1024,  # 512MB
+        max_entries=5000,
+        policy=AdaptivePolicy(),
+        enable_compression=True
+    )
+    
+    # Create cached inference system
+    cached_inference = CachedPNOInference(
+        model=model,
+        cache_system=cache,
+        similarity_threshold=0.95,
+        enable_semantic_caching=True
+    )
+    
+    return cached_inference
+
+
+if __name__ == "__main__":
+    print("🧠 Intelligent Caching System ready for production!")
 
 import time
 import threading

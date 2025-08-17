@@ -1,0 +1,78 @@
+{
+  "apiVersion": "apps/v1",
+  "kind": "Deployment",
+  "metadata": {
+    "name": "redis-cache",
+    "labels": {
+      "app": "redis-cache"
+    }
+  },
+  "spec": {
+    "replicas": 1,
+    "selector": {
+      "matchLabels": {
+        "app": "redis-cache"
+      }
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "app": "redis-cache"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "redis",
+            "image": "redis:7-alpine",
+            "ports": [
+              {
+                "containerPort": 6379
+              }
+            ],
+            "args": [
+              "redis-server",
+              "--maxmemory",
+              "2gb",
+              "--maxmemory-policy",
+              "allkeys-lru",
+              "--save",
+              "900",
+              "1",
+              "--save",
+              "300",
+              "10",
+              "--save",
+              "60",
+              "10000"
+            ],
+            "resources": {
+              "requests": {
+                "cpu": "100m",
+                "memory": "256Mi"
+              },
+              "limits": {
+                "cpu": "500m",
+                "memory": "2Gi"
+              }
+            },
+            "volumeMounts": [
+              {
+                "name": "redis-storage",
+                "mountPath": "/data"
+              }
+            ]
+          }
+        ],
+        "volumes": [
+          {
+            "name": "redis-storage",
+            "persistentVolumeClaim": {
+              "claimName": "redis-pvc"
+            }
+          }
+        ]
+      }
+    }
+  }
+}
