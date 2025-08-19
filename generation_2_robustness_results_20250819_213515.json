@@ -1,0 +1,49 @@
+{
+  "timestamp": "2025-08-19T21:35:15.223520",
+  "tests": {
+    "logging": {
+      "status": "pass",
+      "message": "Logging system operational"
+    },
+    "validation": {
+      "status": "fail",
+      "error": "cannot access local variable 'np' where it is not associated with a value"
+    },
+    "error_handling": {
+      "status": "partial",
+      "summary": {
+        "total_errors": 4,
+        "error_types": {
+          "UnboundLocalError": 1,
+          "ValueError": 1,
+          "RuntimeError": 1,
+          "SecurityError": 1
+        },
+        "last_error": {
+          "error_type": "SecurityError",
+          "error_message": "Test security error",
+          "context": "test_context_2",
+          "timestamp": "2025-08-19T21:35:15.347415",
+          "stack_trace": "NoneType: None\n"
+        },
+        "error_rate": 0.8
+      }
+    },
+    "security": {
+      "status": "fail",
+      "error": "Required config field missing: input_dim"
+    },
+    "health_monitoring": {
+      "status": "pass",
+      "health_status": "healthy",
+      "checks": 3
+    },
+    "integration": {
+      "status": "pass",
+      "score": "100.0%",
+      "components_working": 5,
+      "total_components": 5
+    }
+  },
+  "overall_status": "needs_improvement"
+}
