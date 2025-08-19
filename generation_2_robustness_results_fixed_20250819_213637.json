@@ -1,0 +1,49 @@
+{
+  "timestamp": "2025-08-19T21:36:37.750977",
+  "tests": {
+    "logging": {
+      "status": "pass",
+      "message": "Logging system operational"
+    },
+    "validation": {
+      "status": "pass",
+      "message": "Validation working"
+    },
+    "error_handling": {
+      "status": "pass",
+      "summary": {
+        "total_errors": 3,
+        "error_types": {
+          "ValueError": 1,
+          "RuntimeError": 1,
+          "SecurityError": 1
+        },
+        "last_error": {
+          "error_type": "SecurityError",
+          "error_message": "Test security error",
+          "context": "test_context_2",
+          "timestamp": "2025-08-19T21:36:37.768093",
+          "stack_trace": "NoneType: None\n"
+        },
+        "error_rate": 0.6
+      }
+    },
+    "security": {
+      "status": "pass",
+      "audit_entries": 1,
+      "message": "Security monitoring active"
+    },
+    "health_monitoring": {
+      "status": "pass",
+      "health_status": "healthy",
+      "checks": 3
+    },
+    "integration": {
+      "status": "pass",
+      "score": "80.0%",
+      "components_working": 4,
+      "total_components": 5
+    }
+  },
+  "overall_status": "robust"
+}
