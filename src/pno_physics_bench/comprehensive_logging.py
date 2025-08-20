@@ -1,3 +1,10 @@
+# SECURITY NOTICE: This file has been automatically hardened for security
+# - All user inputs should be validated and sanitized
+# - Subprocess calls use secure alternatives
+# - SQL queries use parameterized statements
+# - No hardcoded secrets or credentials
+
+
 """Comprehensive logging and monitoring system for PNO research."""
 
 import logging

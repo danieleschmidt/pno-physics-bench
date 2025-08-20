@@ -1,0 +1,28 @@
+data_replication:
+  consistency: eventual
+  lag_threshold: 5m
+  strategy: async
+failover:
+  automatic: true
+  dns_ttl: 60
+  failover_threshold: 3
+  health_check_interval: 30s
+regions:
+  primary:
+    name: us-east-1
+    replicas: 3
+    resources:
+      cpu: 2000m
+      memory: 4Gi
+  secondary:
+    name: us-west-2
+    replicas: 2
+    resources:
+      cpu: 1000m
+      memory: 2Gi
+  tertiary:
+    name: eu-west-1
+    replicas: 1
+    resources:
+      cpu: 500m
+      memory: 1Gi

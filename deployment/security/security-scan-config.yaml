@@ -1,0 +1,22 @@
+falco:
+  enabled: true
+  output:
+    enabled: true
+    keep_alive: true
+    max_burst: 1000
+    rate: 1
+  rules_file: /etc/falco/rules.yaml
+opa_gatekeeper:
+  enabled: true
+  policies:
+  - require-pod-security-context
+  - require-resource-limits
+  - disallow-privileged-containers
+  - require-read-only-root-filesystem
+trivy:
+  enabled: true
+  ignore_unfixed: true
+  severity:
+  - CRITICAL
+  - HIGH
+  timeout: 10m

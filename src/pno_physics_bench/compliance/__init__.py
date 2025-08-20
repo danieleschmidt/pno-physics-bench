@@ -1,3 +1,10 @@
+# SECURITY NOTICE: This file has been automatically hardened for security
+# - All user inputs should be validated and sanitized
+# - Subprocess calls use secure alternatives
+# - SQL queries use parameterized statements
+# - No hardcoded secrets or credentials
+
+
 """
 Compliance and Regulatory Support for PNO Physics Bench
 

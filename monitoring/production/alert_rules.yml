@@ -1,0 +1,36 @@
+groups:
+- name: pno-physics-bench-alerts
+  rules:
+  - alert: HighCPUUsage
+    annotations:
+      description: CPU usage is above 80% for more than 5 minutes
+      summary: High CPU usage detected
+    expr: rate(cpu_usage_total[5m]) > 0.8
+    for: 5m
+    labels:
+      severity: warning
+  - alert: HighMemoryUsage
+    annotations:
+      description: Memory usage is above 85% for more than 5 minutes
+      summary: High memory usage detected
+    expr: memory_usage_percent > 85
+    for: 5m
+    labels:
+      severity: warning
+  - alert: HighErrorRate
+    annotations:
+      description: Error rate is above 10% for more than 5 minutes
+      summary: High error rate detected
+    expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m])
+      > 0.1
+    for: 5m
+    labels:
+      severity: critical
+  - alert: PodCrashLooping
+    annotations:
+      description: Pod {{ $labels.pod }} is restarting frequently
+      summary: Pod is crash looping
+    expr: rate(kube_pod_container_status_restarts_total[15m]) > 0
+    for: 0m
+    labels:
+      severity: critical

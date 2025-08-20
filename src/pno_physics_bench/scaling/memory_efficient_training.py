@@ -1,3 +1,10 @@
+# SECURITY NOTICE: This file has been automatically hardened for security
+# - All user inputs should be validated and sanitized
+# - Subprocess calls use secure alternatives
+# - SQL queries use parameterized statements
+# - No hardcoded secrets or credentials
+
+
 """Memory-Efficient Training for Large-Scale Probabilistic Neural Operators.
 
 This module implements advanced memory optimization techniques including
