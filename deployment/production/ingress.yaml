@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/rate-limit: '100'
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: 'true'
+  name: pno-physics-bench-ingress
+  namespace: production
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: pno.terragonlabs.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: pno-physics-bench-service
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - pno.terragonlabs.com
+    secretName: pno-tls-secret

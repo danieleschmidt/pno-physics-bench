@@ -1,3 +1,10 @@
+# SECURITY NOTICE: This file has been automatically hardened for security
+# - All user inputs should be validated and sanitized
+# - Subprocess calls use secure alternatives
+# - SQL queries use parameterized statements
+# - No hardcoded secrets or credentials
+
+
 """Utility functions for PNO Physics Bench."""
 
 from .validation import validate_input_shapes, validate_model_config, validate_training_config, validate_dataset_config

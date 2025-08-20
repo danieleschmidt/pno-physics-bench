@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: pno-physics-bench
+    environment: production
+  name: pno-physics-bench-service
+  namespace: production
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 8000
+  selector:
+    app: pno-physics-bench
+  type: ClusterIP

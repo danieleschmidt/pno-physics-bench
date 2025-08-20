@@ -1,0 +1,30 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pno-backup
+  namespace: production
+spec:
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - command:
+            - /backup-script.sh
+            env:
+            - name: BACKUP_DESTINATION
+              value: s3://pno-backups/
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: aws-access-key
+                  name: backup-secrets
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: aws-secret-key
+                  name: backup-secrets
+            image: terragonlabs/pno-backup:latest
+            name: backup
+          restartPolicy: OnFailure
+  schedule: 0 2 * * *

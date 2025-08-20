@@ -1,0 +1,239 @@
+{
+  "timestamp": "2025-08-20T23:20:47.130895",
+  "validation_type": "comprehensive_quality_gates",
+  "gates": {
+    "code_quality": {
+      "status": "PASS",
+      "score": 96.13792407108238,
+      "metrics": {
+        "python_files_count": 81,
+        "total_lines": 39616,
+        "documentation_coverage": 81,
+        "complexity_issues": 0,
+        "style_issues": 255,
+        "documentation_coverage_percent": 100.0,
+        "overall_quality_score": 96.13792407108238
+      },
+      "requirements": {
+        "min_quality_score": 70,
+        "min_documentation_coverage": 60
+      }
+    },
+    "security": {
+      "status": "FAIL",
+      "score": 0,
+      "issues": [
+        {
+          "file": "src/pno_physics_bench/benchmarks.py",
+          "issue_type": "insecure_functions",
+          "matches": 2,
+          "severity": "MEDIUM"
+        },
+        {
+          "file": "src/pno_physics_bench/cli.py",
+          "issue_type": "insecure_functions",
+          "matches": 1,
+          "severity": "MEDIUM"
+        },
+        {
+          "file": "src/pno_physics_bench/models.py",
+          "issue_type": "insecure_functions",
+          "matches": 1,
+          "severity": "MEDIUM"
+        },
+        {
+          "file": "src/pno_physics_bench/optimization.py",
+          "issue_type": "insecure_functions",
+          "matches": 4,
+          "severity": "MEDIUM"
+        },
+        {
+          "file": "src/pno_physics_bench/optimization_engine.py",
+          "issue_type": "insecure_functions",
+          "matches": 2,
+          "severity": "MEDIUM"
+        },
+        {
+          "file": "src/pno_physics_bench/performance_optimization.py",
+          "issue_type": "insecure_functions",
+          "matches": 1,
+          "severity": "MEDIUM"
+        },
+        {
+          "file": "src/pno_physics_bench/quantum_enhanced_pno.py",
+          "issue_type": "insecure_functions",
+          "matches": 1,
+          "severity": "MEDIUM"
+        },
+        {
+          "file": "src/pno_physics_bench/uncertainty.py",
+          "issue_type": "insecure_functions",
+          "matches": 4,
+          "severity": "MEDIUM"
+        },
+        {
+          "file": "src/pno_physics_bench/monitoring/advanced_health_checks.py",
+          "issue_type": "insecure_functions",
+          "matches": 1,
+          "severity": "MEDIUM"
+        },
+        {
+          "file": "src/pno_physics_bench/research/continual_learning_uncertainty.py",
+          "issue_type": "insecure_functions",
+          "matches": 1,
+          "severity": "MEDIUM"
+        },
+        {
+          "file": "src/pno_physics_bench/research/multi_fidelity.py",
+          "issue_type": "insecure_functions",
+          "matches": 1,
+          "severity": "MEDIUM"
+        },
+        {
+          "file": "src/pno_physics_bench/research/performance_optimizers.py",
+          "issue_type": "insecure_functions",
+          "matches": 2,
+          "severity": "MEDIUM"
+        },
+        {
+          "file": "src/pno_physics_bench/scaling/distributed_inference_optimization.py",
+          "issue_type": "insecure_functions",
+          "matches": 1,
+          "severity": "MEDIUM"
+        },
+        {
+          "file": "src/pno_physics_bench/scaling/distributed_optimization.py",
+          "issue_type": "insecure_functions",
+          "matches": 1,
+          "severity": "MEDIUM"
+        },
+        {
+          "file": "src/pno_physics_bench/scaling/memory_efficient_training.py",
+          "issue_type": "insecure_functions",
+          "matches": 1,
+          "severity": "MEDIUM"
+        },
+        {
+          "file": "src/pno_physics_bench/training/callbacks.py",
+          "issue_type": "insecure_functions",
+          "matches": 1,
+          "severity": "MEDIUM"
+        },
+        {
+          "file": "src/pno_physics_bench/training/trainer.py",
+          "issue_type": "insecure_functions",
+          "matches": 2,
+          "severity": "MEDIUM"
+        },
+        {
+          "file": "src/pno_physics_bench/uncertainty/ensemble_methods.py",
+          "issue_type": "insecure_functions",
+          "matches": 2,
+          "severity": "MEDIUM"
+        },
+        {
+          "file": "src/pno_physics_bench/utils/profiling.py",
+          "issue_type": "insecure_functions",
+          "matches": 1,
+          "severity": "MEDIUM"
+        }
+      ],
+      "security_framework_implemented": true,
+      "requirements": {
+        "min_security_score": 80,
+        "max_high_severity_issues": 0
+      }
+    },
+    "performance": {
+      "status": "PASS",
+      "score": 98.97360801696777,
+      "features_implemented": {
+        "caching_implemented": true,
+        "distributed_computing": true,
+        "auto_scaling": true,
+        "performance_monitoring": true,
+        "memory_optimization": true
+      },
+      "basic_performance_time": 0.0010263919830322266,
+      "requirements": {
+        "min_performance_score": 75,
+        "required_features": [
+          "caching_implemented",
+          "performance_monitoring"
+        ]
+      }
+    },
+    "deployment": {
+      "status": "PASS",
+      "score": 100,
+      "components": {
+        "dockerfile": true,
+        "docker_compose": true,
+        "kubernetes_deployment": true,
+        "kubernetes_service": true,
+        "monitoring_config": true,
+        "deployment_configs": true
+      },
+      "environment_configs_count": 11,
+      "requirements": {
+        "min_deployment_score": 80,
+        "required_components": [
+          "dockerfile",
+          "kubernetes_deployment",
+          "monitoring_config"
+        ]
+      }
+    },
+    "testing": {
+      "status": "PASS",
+      "score": 100,
+      "metrics": {
+        "test_files_count": 13,
+        "test_functions_count": 308,
+        "test_directories": [
+          "tests"
+        ],
+        "test_frameworks": [
+          "pytest"
+        ],
+        "coverage_tools": []
+      },
+      "config_found": true,
+      "requirements": {
+        "min_testing_score": 60,
+        "min_test_files": 5,
+        "min_test_functions": 10
+      }
+    },
+    "documentation": {
+      "status": "PASS",
+      "score": 80,
+      "metrics": {
+        "readme_exists": true,
+        "readme_length": 13072,
+        "api_docs_exist": true,
+        "tutorial_docs": 0,
+        "changelog_exists": true,
+        "contributing_guide": true,
+        "architecture_docs": true
+      },
+      "requirements": {
+        "min_documentation_score": 70,
+        "required_docs": [
+          "readme",
+          "api_docs",
+          "contributing_guide"
+        ]
+      }
+    }
+  },
+  "summary": {
+    "total_gates": 6,
+    "passed_gates": 5,
+    "failed_gates": 1,
+    "pass_rate": 83.33333333333334,
+    "average_score": 79.18525534800835,
+    "overall_status": "FAIL",
+    "validation_complete": true
+  }
+}
