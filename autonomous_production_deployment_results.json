@@ -4,7 +4,8 @@
   "configurations": {
     "ci_cd_pipeline": {
       "status": "configured",
-      "file": ".github/workflows/ci-cd.yml",
+      "file": "GITHUB_WORKFLOWS_SETUP.md",
+      "note": "GitHub workflow configuration provided for manual setup due to permission restrictions",
       "features": [
         "multi_python_testing",
         "security_scanning",
