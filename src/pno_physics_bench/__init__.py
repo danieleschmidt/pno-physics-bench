@@ -24,13 +24,38 @@ try:
     from .datasets import PDEDataset
     from .metrics import CalibrationMetrics
     
+    # Advanced Research Components (2025 Breakthrough)
+    from .research.multi_modal_causal_uncertainty import (
+        MultiModalCausalUncertaintyNetwork,
+        CausalUncertaintyLoss,
+        compute_research_metrics
+    )
+    from .research.cross_domain_uncertainty_transfer import (
+        CrossDomainUncertaintyTransfer,
+        TransferLearningLoss
+    )
+    from .research.comparative_experimental_suite import (
+        ComparativeExperimentRunner,
+        run_mcu_net_experiments
+    )
+    
     __all__ = [
+        # Core Components
         "ProbabilisticNeuralOperator",
-        "FourierNeuralOperator",
+        "FourierNeuralOperator", 
         "DeepONet",
-        "PNOTrainer", 
+        "PNOTrainer",
         "PDEDataset",
         "CalibrationMetrics",
+        
+        # Research Breakthroughs (2025)
+        "MultiModalCausalUncertaintyNetwork",
+        "CausalUncertaintyLoss",
+        "CrossDomainUncertaintyTransfer",
+        "TransferLearningLoss",
+        "ComparativeExperimentRunner",
+        "run_mcu_net_experiments",
+        "compute_research_metrics",
     ]
 except ImportError as e:
     # Allow package to be imported even if dependencies aren't installed
