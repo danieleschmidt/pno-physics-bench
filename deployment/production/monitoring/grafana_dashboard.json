@@ -1,0 +1,91 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "PNO Physics Bench - Production Dashboard",
+    "tags": [
+      "pno",
+      "ml",
+      "production"
+    ],
+    "timezone": "UTC",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Inference Latency",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, pno_inference_duration_seconds)",
+            "legendFormat": "95th percentile"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "Seconds",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(pno_inference_requests_total[5m])",
+            "legendFormat": "Requests/sec"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(pno_inference_errors_total[5m])",
+            "legendFormat": "Errors/sec"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "container_memory_usage_bytes{pod=~\"pno-physics-bench-.*\"}",
+            "legendFormat": "{{ pod }}"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "CPU Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(container_cpu_usage_seconds_total{pod=~\"pno-physics-bench-.*\"}[5m])",
+            "legendFormat": "{{ pod }}"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Uncertainty Distribution",
+        "type": "histogram",
+        "targets": [
+          {
+            "expr": "pno_uncertainty_values",
+            "legendFormat": "Uncertainty"
+          }
+        ]
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "30s"
+  }
+}

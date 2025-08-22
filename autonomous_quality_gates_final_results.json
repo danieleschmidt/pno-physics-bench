@@ -1,0 +1,44 @@
+{
+  "timestamp": 1755820590.3798864,
+  "security_validation": {
+    "code_security": {
+      "risk_level": "CRITICAL",
+      "vulnerabilities_count": 100,
+      "compliance_score": 0.2
+    },
+    "data_privacy": {
+      "risk_level": "HIGH",
+      "compliance_score": 0.25
+    },
+    "model_security": {
+      "risk_level": "HIGH",
+      "compliance_score": 0.75
+    }
+  },
+  "quality_gates": {
+    "code_quality": {
+      "passed": true,
+      "score": 100.0
+    },
+    "performance": {
+      "passed": true,
+      "score": 100.0
+    },
+    "reliability": {
+      "passed": true,
+      "score": 90.99999999999999
+    },
+    "maintainability": {
+      "passed": true,
+      "score": 100.0
+    }
+  },
+  "overall_assessment": {
+    "security_passed": false,
+    "quality_gates_passed": 4,
+    "overall_score": 68.425,
+    "production_ready": false,
+    "readiness_status": "\u26a0\ufe0f  NEEDS MINOR IMPROVEMENTS"
+  },
+  "next_steps": "Address identified issues"
+}

@@ -3,14 +3,18 @@ kind: Service
 metadata:
   labels:
     app: pno-physics-bench
-    environment: production
-  name: pno-physics-bench-service
+  name: pno-service
   namespace: production
 spec:
   ports:
-  - port: 80
+  - name: http
+    port: 80
     protocol: TCP
     targetPort: 8000
+  - name: metrics
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
   selector:
     app: pno-physics-bench
   type: ClusterIP

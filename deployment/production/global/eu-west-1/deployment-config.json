@@ -1,0 +1,34 @@
+{
+  "environment": "production",
+  "region": "eu-west-1",
+  "replicas": 3,
+  "resources": {
+    "cpu_request": "500m",
+    "cpu_limit": "2000m",
+    "memory_request": "1Gi",
+    "memory_limit": "4Gi",
+    "storage": "100Gi",
+    "storage_class": "gp3"
+  },
+  "monitoring": {
+    "prometheus_enabled": true,
+    "grafana_enabled": true,
+    "alertmanager_enabled": true,
+    "log_aggregation": "enabled",
+    "tracing": "jaeger"
+  },
+  "security": {
+    "pod_security_policy": true,
+    "network_policies": true,
+    "rbac": true,
+    "image_scanning": true,
+    "vulnerability_scanning": true
+  },
+  "compliance": {
+    "gdpr": true,
+    "ccpa": false,
+    "sox": true,
+    "iso27001": true,
+    "audit_logging": true
+  }
+}
