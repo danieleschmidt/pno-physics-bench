@@ -1,0 +1,39 @@
+groups:
+- name: pno-physics-bench
+  rules:
+  - alert: PNOHighLatency
+    annotations:
+      description: 95th percentile latency is {{ $value }}s for {{ $labels.instance
+        }}
+      summary: PNO inference latency is high
+    expr: histogram_quantile(0.95, pno_inference_duration_seconds) > 0.5
+    for: 5m
+    labels:
+      severity: warning
+  - alert: PNOHighErrorRate
+    annotations:
+      description: Error rate is {{ $value }} for {{ $labels.instance }}
+      summary: PNO error rate is high
+    expr: rate(pno_inference_errors_total[5m]) > 0.05
+    for: 2m
+    labels:
+      severity: critical
+  - alert: PNOMemoryUsageHigh
+    annotations:
+      description: Memory usage is {{ $value | humanizePercentage }} for {{ $labels.pod
+        }}
+      summary: PNO memory usage is high
+    expr: container_memory_usage_bytes{pod=~"pno-physics-bench-.*"} / container_spec_memory_limit_bytes
+      > 0.9
+    for: 10m
+    labels:
+      severity: warning
+  - alert: PNOReplicasDown
+    annotations:
+      description: Only {{ $value }} replicas are available
+      summary: PNO deployment has insufficient replicas
+    expr: kube_deployment_status_replicas_available{deployment="pno-physics-bench"}
+      < 2
+    for: 1m
+    labels:
+      severity: critical

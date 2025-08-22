@@ -1,0 +1,17 @@
+compliance_frameworks:
+- CIS_Kubernetes
+- NIST_800-53
+- SOC2_Type_II
+image_scanning:
+  enabled: true
+  fail_on_critical: true
+  fail_on_high: true
+  scanners:
+  - trivy
+  - clair
+vulnerability_management:
+  auto_update: true
+  notification_channels:
+  - slack
+  - email
+  severity_threshold: HIGH

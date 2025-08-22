@@ -1,0 +1,34 @@
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets:
+      - alertmanager:9093
+global:
+  evaluation_interval: 15s
+  scrape_interval: 15s
+rule_files:
+- pno_alerts.yml
+scrape_configs:
+- job_name: pno-physics-bench
+  kubernetes_sd_configs:
+  - namespaces:
+      names:
+      - production
+    role: pod
+  relabel_configs:
+  - action: keep
+    regex: 'true'
+    source_labels:
+    - __meta_kubernetes_pod_annotation_prometheus_io_scrape
+  - action: replace
+    regex: (.+)
+    source_labels:
+    - __meta_kubernetes_pod_annotation_prometheus_io_path
+    target_label: __metrics_path__
+  - action: replace
+    regex: ([^:]+)(?::\d+)?;(\d+)
+    replacement: ${1}:${2}
+    source_labels:
+    - __address__
+    - __meta_kubernetes_pod_annotation_prometheus_io_port
+    target_label: __address__
