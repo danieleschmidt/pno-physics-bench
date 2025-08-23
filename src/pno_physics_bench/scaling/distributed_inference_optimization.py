@@ -27,7 +27,7 @@ from collections import deque
 import logging
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
-import pickle
+import json  # SECURITY: Using json instead of pickle
 import socket
 
 

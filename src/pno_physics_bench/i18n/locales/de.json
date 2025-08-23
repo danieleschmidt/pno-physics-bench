@@ -1,0 +1,143 @@
+{
+  "errors": {
+    "model": {
+      "invalid_input_dim": "Ungültige Eingabedimension: {input_dim}. Muss eine positive ganze Zahl sein.",
+      "invalid_hidden_dim": "Ungültige versteckte Dimension: {hidden_dim}. Muss eine positive ganze Zahl sein.",
+      "invalid_modes": "Ungültige Modi: {modes}. Muss eine positive ganze Zahl sein.",
+      "forward_failed": "Vorwärtsdurchlauf fehlgeschlagen: {error_msg}",
+      "uncertainty_estimation_failed": "Unsicherheitsschätzung fehlgeschlagen: {error_msg}",
+      "nan_in_predictions": "NaN-Werte in Modellvorhersagen erkannt",
+      "inf_in_uncertainties": "Unendliche Werte in Unsicherheiten erkannt"
+    },
+    "training": {
+      "invalid_learning_rate": "Ungültige Lernrate: {lr}. Muss positiv sein.",
+      "invalid_batch_size": "Ungültige Stapelgröße: {batch_size}. Muss eine positive ganze Zahl sein.",
+      "convergence_failed": "Trainingskonvergenz nach {epochs} Epochen fehlgeschlagen",
+      "gradient_explosion": "Gradientenexplosion erkannt. Erwägen Sie eine Reduzierung der Lernrate.",
+      "loss_nan": "Verlust wurde NaN während des Trainings bei Schritt {step}",
+      "checkpoint_save_failed": "Fehler beim Speichern des Checkpoints: {error_msg}",
+      "checkpoint_load_failed": "Fehler beim Laden des Checkpoints: {error_msg}"
+    },
+    "data": {
+      "invalid_dataset_path": "Ungültiger Datensatzpfad: {path}",
+      "corrupt_data": "Korrupte Daten in Datei erkannt: {filename}",
+      "incompatible_shapes": "Inkompatible Datenformen: erwartet {expected}, erhalten {actual}",
+      "missing_required_field": "Fehlendes Pflichtfeld: {field_name}",
+      "invalid_resolution": "Ungültige Auflösung: {resolution}. Muss eine Potenz von 2 sein."
+    },
+    "uncertainty": {
+      "negative_uncertainty": "Negative Unsicherheitswerte erkannt",
+      "zero_uncertainty": "Null-Unsicherheit erkannt. Dies kann auf Modell-Selbstüberschätzung hinweisen.",
+      "calibration_failed": "Unsicherheitskalibrierung fehlgeschlagen: {error_msg}",
+      "sampling_failed": "Unsicherheitsstichprobe fehlgeschlagen: {error_msg}",
+      "aggregation_failed": "Multi-Modell-Unsicherheitsaggregation fehlgeschlagen: {error_msg}"
+    },
+    "physics": {
+      "invalid_reynolds_number": "Ungültige Reynolds-Zahl: {re_num}. Muss positiv sein.",
+      "invalid_boundary_conditions": "Ungültige Randbedingungen: {bc_type}",
+      "physics_loss_diverged": "Physik-Verlust divergiert. Überprüfen Sie PDE-Parameter.",
+      "conservation_violation": "Verletzung des Erhaltungsgesetzes erkannt: {violation_type}"
+    },
+    "performance": {
+      "out_of_memory": "Speicherfehler. Erwägen Sie eine Reduzierung der Stapel- oder Modellgröße.",
+      "cuda_error": "CUDA-Fehler aufgetreten: {cuda_error}",
+      "compilation_failed": "Modellkompilierung fehlgeschlagen: {error_msg}",
+      "kernel_launch_failed": "GPU-Kernel-Start fehlgeschlagen: {error_msg}"
+    }
+  },
+  "warnings": {
+    "model": {
+      "large_model_size": "Große Modellgröße erkannt ({size:.1f}MB). Erwägen Sie Gradient-Checkpointing.",
+      "deprecated_parameter": "Parameter '{param_name}' ist veraltet. Verwenden Sie stattdessen '{new_param}'.",
+      "suboptimal_precision": "Die Verwendung von {precision}-Präzision kann die Unsicherheitsqualität beeinträchtigen."
+    },
+    "training": {
+      "slow_convergence": "Langsame Konvergenz erkannt. Erwägen Sie eine Anpassung der Lernrate.",
+      "validation_plateau": "Validierungsverlust stagnierte für {steps} Schritte.",
+      "overfitting_detected": "Mögliche Überanpassung: Validierungsverlust steigt.",
+      "high_uncertainty": "Hohe durchschnittliche Unsicherheit ({uncertainty:.3f}) erkannt."
+    },
+    "data": {
+      "imbalanced_dataset": "Datensatz scheint über PDE-Typen unausgewogen zu sein.",
+      "low_resolution_data": "Niedrigauflösende Daten können die Modellgenauigkeit beeinträchtigen.",
+      "missing_validation_data": "Keine Validierungsdaten bereitgestellt. Verwende Train/Val-Split."
+    }
+  },
+  "info": {
+    "model": {
+      "initialization_complete": "Modellinitialisierung abgeschlossen. Parameter: {param_count:,}",
+      "forward_pass_complete": "Vorwärtsdurchlauf abgeschlossen. Form: {output_shape}",
+      "uncertainty_stats": "Unsicherheitsstatistik - Mittel: {mean:.4f}, Std: {std:.4f}",
+      "calibration_score": "Unsicherheitskalibrierungswert: {score:.3f}"
+    },
+    "training": {
+      "epoch_complete": "Epoche {epoch}/{total_epochs} - Verlust: {loss:.6f}, Zeit: {time:.2f}s",
+      "best_model_updated": "Bestes Modell aktualisiert in Epoche {epoch} mit Verlust {loss:.6f}",
+      "training_complete": "Training erfolgreich abgeschlossen in {duration:.2f} Minuten",
+      "checkpoint_saved": "Checkpoint gespeichert unter {path}"
+    },
+    "research": {
+      "hierarchical_decomposition": "Hierarchische Unsicherheitszerlegung abgeschlossen",
+      "multi_fidelity_fusion": "Multi-Fidelity-Unsicherheitsfusion abgeschlossen",
+      "spectral_analysis_complete": "Spektrale Unsicherheitsanalyse abgeschlossen",
+      "adaptive_computation": "Adaptive Berechnungsweiterleitung aktiviert"
+    },
+    "performance": {
+      "memory_usage": "Aktuelle Speichernutzung: {memory_mb:.1f} MB",
+      "inference_speed": "Inferenzgeschwindigkeit: {samples_per_sec:.1f} Proben/Sekunde",
+      "optimization_applied": "Leistungsoptimierung '{opt_name}' erfolgreich angewendet"
+    }
+  },
+  "ui": {
+    "buttons": {
+      "train": "Modell Trainieren",
+      "evaluate": "Bewerten",
+      "save": "Speichern",
+      "load": "Laden",
+      "export": "Exportieren",
+      "cancel": "Abbrechen",
+      "continue": "Weiter",
+      "reset": "Zurücksetzen"
+    },
+    "labels": {
+      "model_type": "Modelltyp",
+      "learning_rate": "Lernrate",
+      "batch_size": "Stapelgröße",
+      "epochs": "Epochen",
+      "uncertainty_type": "Unsicherheitstyp",
+      "physics_constraint": "Physik-Beschränkung",
+      "performance_mode": "Leistungsmodus"
+    },
+    "tooltips": {
+      "learning_rate": "Steuert, wie schnell das Modell lernt. Beginnen Sie mit 1e-3.",
+      "uncertainty_type": "Art der zu verwendenden Unsicherheitsquantifizierung.",
+      "physics_constraint": "Physik-informierte Beschränkungen, die während des Trainings durchgesetzt werden."
+    },
+    "tabs": {
+      "training": "Training",
+      "evaluation": "Bewertung",
+      "uncertainty": "Unsicherheitsanalyse",
+      "performance": "Leistung",
+      "settings": "Einstellungen"
+    }
+  },
+  "compliance": {
+    "gdpr": {
+      "data_usage": "Dieses Modell verarbeitet nur numerische PDE-Daten. Es werden keine persönlichen Daten gesammelt.",
+      "consent_required": "Benutzerzustimmung erforderlich für das Teilen von Unsicherheitsdaten",
+      "right_to_explanation": "Unsicherheitsschätzungen basieren auf Ensemble-Varianz und Kalibrierungsmetriken"
+    },
+    "audit": {
+      "model_provenance": "Modell trainiert auf {dataset_name} mit {training_samples:,} Proben",
+      "uncertainty_methodology": "Unsicherheit quantifiziert mit {method} mit {confidence_level}% Konfidenzintervallen",
+      "validation_results": "Modellvalidierung RMSE: {rmse:.6f}, Kalibrierung: {calibration:.3f}"
+    }
+  },
+  "formats": {
+    "date": "dd.MM.yyyy",
+    "time": "HH:mm:ss",
+    "datetime": "dd.MM.yyyy HH:mm:ss",
+    "number": "#.###,##",
+    "currency": "#.###,## €"
+  }
+}

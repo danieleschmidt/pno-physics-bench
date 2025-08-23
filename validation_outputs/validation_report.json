@@ -1,0 +1,84 @@
+{
+  "timestamp": "2025-08-23T20:30:41.385904",
+  "summary": {
+    "total_tests": 11,
+    "passed": 7,
+    "failed": 4,
+    "skipped": 0,
+    "duration": 0.004624843597412109,
+    "success_rate": 63.63636363636363
+  },
+  "detailed_results": {
+    "python_version": {
+      "status": "PASS",
+      "message": "Python 3.12.3",
+      "details": null,
+      "timestamp": "2025-08-23T20:30:41.381393"
+    },
+    "pytorch_installation": {
+      "status": "FAIL",
+      "message": "PyTorch not installed - pip install torch",
+      "details": null,
+      "timestamp": "2025-08-23T20:30:41.382313"
+    },
+    "numpy_installation": {
+      "status": "FAIL",
+      "message": "NumPy not installed - pip install numpy",
+      "details": null,
+      "timestamp": "2025-08-23T20:30:41.382628"
+    },
+    "optional_dependencies": {
+      "status": "PASS",
+      "message": "Available: None",
+      "details": null,
+      "timestamp": "2025-08-23T20:30:41.383470"
+    },
+    "project_structure": {
+      "status": "PASS",
+      "message": "All required directories present",
+      "details": null,
+      "timestamp": "2025-08-23T20:30:41.383728"
+    },
+    "research_modules": {
+      "status": "PASS",
+      "message": "Found 4 research modules",
+      "details": null,
+      "timestamp": "2025-08-23T20:30:41.383932"
+    },
+    "write_permissions": {
+      "status": "PASS",
+      "message": "Write permissions verified",
+      "details": null,
+      "timestamp": "2025-08-23T20:30:41.384520"
+    },
+    "device_setup": {
+      "status": "FAIL",
+      "message": "Device setup failed: No module named 'torch'",
+      "details": null,
+      "timestamp": "2025-08-23T20:30:41.384878"
+    },
+    "flagship_demo_exists": {
+      "status": "PASS",
+      "message": "Flagship demo script exists and is readable",
+      "details": null,
+      "timestamp": "2025-08-23T20:30:41.385039"
+    },
+    "minimal_experiment": {
+      "status": "FAIL",
+      "message": "Minimal experiment failed: No module named 'torch'",
+      "details": null,
+      "timestamp": "2025-08-23T20:30:41.385239"
+    },
+    "output_generation": {
+      "status": "PASS",
+      "message": "Output file generation working correctly",
+      "details": null,
+      "timestamp": "2025-08-23T20:30:41.385742"
+    }
+  },
+  "system_info": {
+    "python_version": "3.12.3 (main, Jun 18 2025, 17:59:45) [GCC 13.3.0]",
+    "platform": "linux",
+    "working_directory": "/root/repo"
+  }
+}

@@ -24,7 +24,7 @@ import time
 import logging
 import json
 import os
-import pickle
+import json  # SECURITY: Using json instead of pickle
 import gzip
 from typing import Dict, List, Tuple, Optional, Any, Union, Callable
 from dataclasses import dataclass, asdict

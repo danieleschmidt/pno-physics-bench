@@ -1,0 +1,253 @@
+# Global Ingress Configuration for Multi-Cloud Deployment
+# Supports AWS ALB, GCP Load Balancer, and Azure Application Gateway
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pno-physics-bench-ingress
+  namespace: pno-physics-bench
+  labels:
+    app: pno-physics-bench
+    tier: production
+  annotations:
+    # Common annotations
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/rate-limit-connections: "10"
+    nginx.ingress.kubernetes.io/rate-limit-requests-per-minute: "1000"
+    
+    # CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+    
+    # AWS ALB specific annotations
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:region:account:certificate/cert-id
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/wafv2-acl-arn: arn:aws:wafv2:region:account:regional/webacl/name/id
+    alb.ingress.kubernetes.io/load-balancer-attributes: |
+      idle_timeout.timeout_seconds=60,
+      routing.http2.enabled=true,
+      access_logs.s3.enabled=true,
+      access_logs.s3.bucket=pno-alb-logs,
+      access_logs.s3.prefix=pno-physics-bench
+    
+    # GCP specific annotations
+    cloud.google.com/load-balancer-type: External
+    ingress.gcp.kubernetes.io/pre-shared-cert: "pno-physics-bench-ssl-cert"
+    cloud.google.com/armor-config: '{"pno-security-policy": "pno-security-policy"}'
+    
+    # Azure Application Gateway annotations
+    appgw.ingress.kubernetes.io/ssl-redirect: "true"
+    appgw.ingress.kubernetes.io/cookie-based-affinity: "Disabled"
+    appgw.ingress.kubernetes.io/request-timeout: "30"
+    appgw.ingress.kubernetes.io/connection-draining: "true"
+    appgw.ingress.kubernetes.io/connection-draining-timeout: "30"
+
+spec:
+  tls:
+  - hosts:
+    - api.pno-physics.com
+    - cdn.pno-physics.com
+    - monitoring.pno-physics.com
+    secretName: pno-physics-bench-tls
+  rules:
+  - host: api.pno-physics.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: pno-physics-bench
+            port:
+              number: 80
+      - path: /api/v1
+        pathType: Prefix
+        backend:
+          service:
+            name: pno-physics-bench
+            port:
+              number: 80
+      - path: /health
+        pathType: Exact
+        backend:
+          service:
+            name: pno-physics-bench
+            port:
+              number: 80
+      - path: /metrics
+        pathType: Exact
+        backend:
+          service:
+            name: pno-physics-bench
+            port:
+              number: 8080
+  - host: cdn.pno-physics.com
+    http:
+      paths:
+      - path: /static
+        pathType: Prefix
+        backend:
+          service:
+            name: pno-physics-bench
+            port:
+              number: 80
+      - path: /docs
+        pathType: Prefix
+        backend:
+          service:
+            name: pno-physics-bench
+            port:
+              number: 80
+---
+# Regional Ingress for EU (GDPR compliance)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pno-physics-bench-ingress-eu
+  namespace: pno-physics-bench
+  labels:
+    app: pno-physics-bench
+    tier: production
+    region: eu
+    compliance: gdpr
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # GDPR specific headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-GDPR-Compliant: true";
+      more_set_headers "X-Data-Residency: EU";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload";
+    
+    # Enhanced rate limiting for EU
+    nginx.ingress.kubernetes.io/rate-limit-connections: "20"
+    nginx.ingress.kubernetes.io/rate-limit-requests-per-minute: "2000"
+    
+    # EU data center routing
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
+
+spec:
+  tls:
+  - hosts:
+    - eu.api.pno-physics.com
+    secretName: pno-physics-bench-tls-eu
+  rules:
+  - host: eu.api.pno-physics.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: pno-physics-bench
+            port:
+              number: 80
+---
+# Regional Ingress for APAC (PDPA compliance)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pno-physics-bench-ingress-apac
+  namespace: pno-physics-bench
+  labels:
+    app: pno-physics-bench
+    tier: production
+    region: apac
+    compliance: pdpa
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # PDPA specific headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-PDPA-Compliant: true";
+      more_set_headers "X-Data-Residency: Singapore";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains; preload";
+    
+    # APAC optimized routing
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
+
+spec:
+  tls:
+  - hosts:
+    - apac.api.pno-physics.com
+    secretName: pno-physics-bench-tls-apac
+  rules:
+  - host: apac.api.pno-physics.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: pno-physics-bench
+            port:
+              number: 80
+---
+# TLS Certificate Secret (to be populated by cert-manager or external certificates)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pno-physics-bench-tls
+  namespace: pno-physics-bench
+  labels:
+    app: pno-physics-bench
+type: kubernetes.io/tls
+data:
+  # Base64 encoded certificate and key
+  # These would be populated by cert-manager or external certificate management
+  tls.crt: LS0tLS1CRUdJTi...
+  tls.key: LS0tLS1CRUdJTi...
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pno-physics-bench-tls-eu
+  namespace: pno-physics-bench
+  labels:
+    app: pno-physics-bench
+    region: eu
+type: kubernetes.io/tls
+data:
+  tls.crt: LS0tLS1CRUdJTi...
+  tls.key: LS0tLS1CRUdJTi...
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pno-physics-bench-tls-apac
+  namespace: pno-physics-bench
+  labels:
+    app: pno-physics-bench
+    region: apac
+type: kubernetes.io/tls
+data:
+  tls.crt: LS0tLS1CRUdJTi...
+  tls.key: LS0tLS1CRUdJTi...

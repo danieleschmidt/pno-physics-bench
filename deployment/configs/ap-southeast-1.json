@@ -1,0 +1,66 @@
+{
+  "environment": "production", 
+  "region": "ap-southeast-1",
+  "availability_zones": ["ap-southeast-1a", "ap-southeast-1b", "ap-southeast-1c"],
+  "replicas": 4,
+  "resources": {
+    "cpu_request": "500m",
+    "cpu_limit": "2000m",
+    "memory_request": "1Gi", 
+    "memory_limit": "4Gi",
+    "storage": "100Gi",
+    "storage_class": "gp3"
+  },
+  "networking": {
+    "load_balancer_type": "network",
+    "cdn_enabled": true,
+    "cdn_provider": "cloudfront",
+    "ssl_termination": "load_balancer"
+  },
+  "monitoring": {
+    "prometheus_enabled": true,
+    "grafana_enabled": true,
+    "alertmanager_enabled": true,
+    "log_aggregation": "enabled",
+    "tracing": "jaeger",
+    "metrics_retention": "30d",
+    "logs_retention": "90d"
+  },
+  "security": {
+    "pod_security_policy": true,
+    "network_policies": true,
+    "rbac": true,
+    "image_scanning": true,
+    "vulnerability_scanning": true,
+    "encryption_at_rest": true,
+    "encryption_in_transit": true
+  },
+  "compliance": {
+    "gdpr": false,
+    "ccpa": false,
+    "pdpa": true,
+    "iso27001": true,
+    "audit_logging": true,
+    "data_residency": "singapore"
+  },
+  "scaling": {
+    "hpa_enabled": true,
+    "min_replicas": 2,
+    "max_replicas": 20,
+    "target_cpu_utilization": 70,
+    "target_memory_utilization": 80
+  },
+  "backup": {
+    "enabled": true,
+    "schedule": "0 2 * * *",
+    "retention": "30d",
+    "cross_region_replication": true,
+    "encryption": true
+  },
+  "disaster_recovery": {
+    "rpo": "1h",
+    "rto": "4h",
+    "backup_regions": ["ap-northeast-1", "us-west-2"],
+    "automated_failover": true
+  }
+}

@@ -1,0 +1,1072 @@
+# Comprehensive Monitoring Stack for PNO Physics Bench
+# Includes Prometheus, Grafana, AlertManager, and custom dashboards
+
+---
+# Monitoring Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    name: monitoring
+
+---
+# Prometheus ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: 'pno-production'
+        environment: 'production'
+
+    rule_files:
+      - "/etc/prometheus/rules/*.yml"
+
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets:
+              - alertmanager:9093
+
+    scrape_configs:
+      # PNO Physics Bench Application
+      - job_name: 'pno-physics-bench'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - production
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: ${1}:${2}
+            target_label: __address__
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+
+      # Kubernetes Nodes
+      - job_name: 'kubernetes-nodes'
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+          - target_label: __address__
+            replacement: kubernetes.default.svc:443
+          - source_labels: [__meta_kubernetes_node_name]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /api/v1/nodes/${1}/proxy/metrics
+
+      # Kubernetes Pods
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: ${1}:${2}
+            target_label: __address__
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+
+      # cAdvisor (Container metrics)
+      - job_name: 'kubernetes-cadvisor'
+        kubernetes_sd_configs:
+          - role: node
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+          - target_label: __address__
+            replacement: kubernetes.default.svc:443
+          - source_labels: [__meta_kubernetes_node_name]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+
+      # API Server
+      - job_name: 'kubernetes-apiservers'
+        kubernetes_sd_configs:
+          - role: endpoints
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: default;kubernetes;https
+
+---
+# Prometheus Alerting Rules
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: monitoring
+data:
+  pno-alerts.yml: |
+    groups:
+      - name: pno-physics-bench.rules
+        rules:
+          # SLA Monitoring Rules
+          - alert: PNOAvailabilityCritical
+            expr: |
+              (
+                sum(rate(http_requests_total{job="pno-physics-bench",status!~"5.."}[5m])) /
+                sum(rate(http_requests_total{job="pno-physics-bench"}[5m]))
+              ) < 0.995
+            for: 2m
+            labels:
+              severity: critical
+              service: pno-physics-bench
+              sla_impact: availability
+            annotations:
+              summary: "PNO service availability below SLA threshold"
+              description: "Service availability is {{ $value | humanizePercentage }}, below the 99.5% SLA requirement"
+              runbook_url: "https://runbooks.company.com/pno-availability"
+
+          - alert: PNOResponseTimeHigh
+            expr: |
+              histogram_quantile(0.95, 
+                rate(http_request_duration_seconds_bucket{job="pno-physics-bench"}[5m])
+              ) > 0.5
+            for: 5m
+            labels:
+              severity: warning
+              service: pno-physics-bench
+              sla_impact: performance
+            annotations:
+              summary: "PNO P95 response time above SLA threshold"
+              description: "95th percentile response time is {{ $value | humanizeDuration }}, above 500ms SLA"
+              runbook_url: "https://runbooks.company.com/pno-performance"
+
+          - alert: PNOErrorRateHigh
+            expr: |
+              sum(rate(http_requests_total{job="pno-physics-bench",status=~"5.."}[5m])) /
+              sum(rate(http_requests_total{job="pno-physics-bench"}[5m]))
+              > 0.001
+            for: 2m
+            labels:
+              severity: critical
+              service: pno-physics-bench
+              sla_impact: error_rate
+            annotations:
+              summary: "PNO error rate above SLA threshold"
+              description: "Error rate is {{ $value | humanizePercentage }}, above 0.1% SLA threshold"
+              runbook_url: "https://runbooks.company.com/pno-errors"
+
+          - alert: PNOThroughputLow
+            expr: |
+              sum(rate(http_requests_total{job="pno-physics-bench"}[5m])) < 100
+            for: 10m
+            labels:
+              severity: warning
+              service: pno-physics-bench
+              sla_impact: throughput
+            annotations:
+              summary: "PNO request throughput below minimum SLA"
+              description: "Current throughput is {{ $value }} RPS, below 100 RPS minimum SLA"
+              runbook_url: "https://runbooks.company.com/pno-throughput"
+
+          # Infrastructure Health Rules
+          - alert: PNOPodDown
+            expr: up{job="pno-physics-bench"} == 0
+            for: 1m
+            labels:
+              severity: critical
+              service: pno-physics-bench
+            annotations:
+              summary: "PNO pod is down"
+              description: "Pod {{ $labels.kubernetes_pod_name }} is not responding to health checks"
+              runbook_url: "https://runbooks.company.com/pno-pod-down"
+
+          - alert: PNOPodCrashLooping
+            expr: |
+              rate(kube_pod_container_status_restarts_total{pod=~"pno-physics-bench-.*"}[15m]) * 60 * 15 > 5
+            for: 0m
+            labels:
+              severity: critical
+              service: pno-physics-bench
+            annotations:
+              summary: "PNO pod is crash looping"
+              description: "Pod {{ $labels.pod }} has restarted {{ $value }} times in the last 15 minutes"
+              runbook_url: "https://runbooks.company.com/pno-crash-loop"
+
+          - alert: PNOMemoryUsageHigh
+            expr: |
+              container_memory_usage_bytes{pod=~"pno-physics-bench-.*"} / 
+              container_spec_memory_limit_bytes{pod=~"pno-physics-bench-.*"} > 0.9
+            for: 10m
+            labels:
+              severity: warning
+              service: pno-physics-bench
+            annotations:
+              summary: "PNO pod memory usage is high"
+              description: "Pod {{ $labels.pod }} memory usage is {{ $value | humanizePercentage }}"
+              runbook_url: "https://runbooks.company.com/pno-memory"
+
+          - alert: PNOCPUUsageHigh
+            expr: |
+              rate(container_cpu_usage_seconds_total{pod=~"pno-physics-bench-.*"}[5m]) > 1.5
+            for: 15m
+            labels:
+              severity: warning
+              service: pno-physics-bench
+            annotations:
+              summary: "PNO pod CPU usage is high"
+              description: "Pod {{ $labels.pod }} CPU usage is {{ $value }} cores"
+              runbook_url: "https://runbooks.company.com/pno-cpu"
+
+          - alert: PNODiskSpaceLow
+            expr: |
+              (
+                node_filesystem_avail_bytes{mountpoint="/app/models"} / 
+                node_filesystem_size_bytes{mountpoint="/app/models"}
+              ) < 0.1
+            for: 5m
+            labels:
+              severity: warning
+              service: pno-physics-bench
+            annotations:
+              summary: "PNO model storage disk space is low"
+              description: "Only {{ $value | humanizePercentage }} disk space remaining on model storage"
+              runbook_url: "https://runbooks.company.com/pno-disk"
+
+          - alert: PNOReplicasInsufficient
+            expr: |
+              kube_deployment_status_replicas_available{deployment="pno-physics-bench"} < 2
+            for: 1m
+            labels:
+              severity: critical
+              service: pno-physics-bench
+            annotations:
+              summary: "PNO deployment has insufficient replicas"
+              description: "Only {{ $value }} replicas are available, below minimum of 2"
+              runbook_url: "https://runbooks.company.com/pno-replicas"
+
+          # Model Performance Rules
+          - alert: PNOModelInferenceLatencyHigh
+            expr: |
+              histogram_quantile(0.95, 
+                rate(pno_inference_duration_seconds_bucket[5m])
+              ) > 1.0
+            for: 5m
+            labels:
+              severity: warning
+              service: pno-physics-bench
+              component: ml-inference
+            annotations:
+              summary: "PNO model inference latency is high"
+              description: "Model inference P95 latency is {{ $value | humanizeDuration }}"
+              runbook_url: "https://runbooks.company.com/pno-ml-performance"
+
+          - alert: PNOModelAccuracyDegraded
+            expr: |
+              pno_model_accuracy_score < 0.95
+            for: 10m
+            labels:
+              severity: critical
+              service: pno-physics-bench
+              component: ml-model
+            annotations:
+              summary: "PNO model accuracy has degraded"
+              description: "Model accuracy is {{ $value }}, below 95% threshold"
+              runbook_url: "https://runbooks.company.com/pno-model-accuracy"
+
+          - alert: PNOUncertaintyCalibrationPoor
+            expr: |
+              abs(pno_uncertainty_calibration_error) > 0.05
+            for: 15m
+            labels:
+              severity: warning
+              service: pno-physics-bench
+              component: ml-uncertainty
+            annotations:
+              summary: "PNO uncertainty calibration is poor"
+              description: "Uncertainty calibration error is {{ $value }}"
+              runbook_url: "https://runbooks.company.com/pno-uncertainty"
+
+          # Business Logic Rules
+          - alert: PNOPredictionVolumeHigh
+            expr: |
+              sum(rate(pno_predictions_total[5m])) > 1000
+            for: 5m
+            labels:
+              severity: info
+              service: pno-physics-bench
+            annotations:
+              summary: "PNO prediction volume is unusually high"
+              description: "Prediction rate is {{ $value }} per second"
+
+          - alert: PNOPredictionVolumeLow
+            expr: |
+              sum(rate(pno_predictions_total[5m])) < 1
+            for: 30m
+            labels:
+              severity: warning
+              service: pno-physics-bench
+            annotations:
+              summary: "PNO prediction volume is unusually low"
+              description: "Prediction rate is {{ $value }} per second, may indicate integration issues"
+
+          # Security Rules
+          - alert: PNOUnauthorizedAccess
+            expr: |
+              sum(rate(http_requests_total{job="pno-physics-bench",status="401"}[5m])) > 5
+            for: 2m
+            labels:
+              severity: warning
+              service: pno-physics-bench
+              security: access-control
+            annotations:
+              summary: "High rate of unauthorized access attempts"
+              description: "{{ $value }} unauthorized requests per second"
+              runbook_url: "https://runbooks.company.com/pno-security"
+
+          - alert: PNOSuspiciousActivity
+            expr: |
+              sum(rate(http_requests_total{job="pno-physics-bench",status="403"}[5m])) > 10
+            for: 1m
+            labels:
+              severity: critical
+              service: pno-physics-bench
+              security: suspicious-activity
+            annotations:
+              summary: "Suspicious activity detected"
+              description: "{{ $value }} forbidden requests per second, possible attack"
+              runbook_url: "https://runbooks.company.com/pno-security-incident"
+
+      - name: sla-burn-rate.rules
+        rules:
+          # Error Budget Burn Rate Alerts
+          - alert: PNOErrorBudgetBurnRateFast
+            expr: |
+              (
+                1 - (
+                  sum(rate(http_requests_total{job="pno-physics-bench",status!~"5.."}[1h])) / 
+                  sum(rate(http_requests_total{job="pno-physics-bench"}[1h]))
+                )
+              ) > (0.001 * 14.4)  # 14.4x normal burn rate
+            for: 2m
+            labels:
+              severity: critical
+              service: pno-physics-bench
+              sla_impact: error_budget
+            annotations:
+              summary: "Error budget burning too fast"
+              description: "At current rate, monthly error budget will be exhausted in {{ $value | humanizeDuration }}"
+              runbook_url: "https://runbooks.company.com/pno-error-budget"
+
+          - alert: PNOErrorBudgetBurnRateModerate
+            expr: |
+              (
+                1 - (
+                  sum(rate(http_requests_total{job="pno-physics-bench",status!~"5.."}[6h])) / 
+                  sum(rate(http_requests_total{job="pno-physics-bench"}[6h]))
+                )
+              ) > (0.001 * 6)  # 6x normal burn rate
+            for: 15m
+            labels:
+              severity: warning
+              service: pno-physics-bench
+              sla_impact: error_budget
+            annotations:
+              summary: "Error budget burning at moderate rate"
+              description: "Current error budget burn rate is {{ $value }}x normal"
+              runbook_url: "https://runbooks.company.com/pno-error-budget"
+
+---
+# Prometheus Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      serviceAccountName: prometheus
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v2.40.0
+        args:
+          - '--config.file=/etc/prometheus/prometheus.yml'
+          - '--storage.tsdb.path=/prometheus/'
+          - '--web.console.libraries=/etc/prometheus/console_libraries'
+          - '--web.console.templates=/etc/prometheus/consoles'
+          - '--storage.tsdb.retention.time=30d'
+          - '--web.enable-lifecycle'
+          - '--web.enable-admin-api'
+        ports:
+        - containerPort: 9090
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        volumeMounts:
+        - name: prometheus-config-volume
+          mountPath: /etc/prometheus/
+        - name: prometheus-rules-volume
+          mountPath: /etc/prometheus/rules/
+        - name: prometheus-storage-volume
+          mountPath: /prometheus/
+      volumes:
+      - name: prometheus-config-volume
+        configMap:
+          name: prometheus-config
+      - name: prometheus-rules-volume
+        configMap:
+          name: prometheus-rules
+      - name: prometheus-storage-volume
+        persistentVolumeClaim:
+          claimName: prometheus-storage
+
+---
+# Prometheus Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  selector:
+    app: prometheus
+  ports:
+    - port: 9090
+      targetPort: 9090
+  type: ClusterIP
+
+---
+# Prometheus ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: monitoring
+
+---
+# Prometheus ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus
+rules:
+- apiGroups: [""]
+  resources:
+  - nodes
+  - nodes/proxy
+  - services
+  - endpoints
+  - pods
+  verbs: ["get", "list", "watch"]
+- apiGroups:
+  - extensions
+  resources:
+  - ingresses
+  verbs: ["get", "list", "watch"]
+- nonResourceURLs: ["/metrics"]
+  verbs: ["get"]
+
+---
+# Prometheus ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus
+subjects:
+- kind: ServiceAccount
+  name: prometheus
+  namespace: monitoring
+
+---
+# Prometheus PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-storage
+  namespace: monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: gp3
+
+---
+# AlertManager ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+data:
+  alertmanager.yml: |
+    global:
+      smtp_smarthost: 'smtp.company.com:587'
+      smtp_from: 'alerts@company.com'
+      smtp_auth_username: 'alerts@company.com'
+      smtp_auth_password: 'smtp-password'
+
+    route:
+      group_by: ['alertname', 'cluster', 'service']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 1h
+      receiver: 'default-receiver'
+      routes:
+      - match:
+          severity: critical
+        receiver: 'critical-receiver'
+        group_wait: 0s
+        group_interval: 5m
+        repeat_interval: 15m
+      - match:
+          security: suspicious-activity
+        receiver: 'security-receiver'
+        group_wait: 0s
+        repeat_interval: 5m
+
+    receivers:
+    - name: 'default-receiver'
+      email_configs:
+      - to: 'ops-team@company.com'
+        subject: '{{ .GroupLabels.alertname }} - {{ .GroupLabels.service }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+      slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#pno-alerts'
+        title: 'PNO Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          {{ .Annotations.summary }}
+          {{ .Annotations.description }}
+          {{ end }}
+
+    - name: 'critical-receiver'
+      email_configs:
+      - to: 'ops-team@company.com,engineering-leads@company.com'
+        subject: 'CRITICAL: {{ .GroupLabels.alertname }} - {{ .GroupLabels.service }}'
+        body: |
+          CRITICAL ALERT FIRED
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+      slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#pno-critical-alerts'
+        title: 'CRITICAL: PNO {{ .GroupLabels.alertname }}'
+        text: |
+          @here CRITICAL ALERT
+          {{ range .Alerts }}
+          {{ .Annotations.summary }}
+          {{ .Annotations.description }}
+          {{ end }}
+      pagerduty_configs:
+      - service_key: 'your-pagerduty-service-key'
+        description: '{{ .GroupLabels.alertname }} - {{ .GroupLabels.service }}'
+
+    - name: 'security-receiver'
+      email_configs:
+      - to: 'security-team@company.com,ops-team@company.com'
+        subject: 'SECURITY ALERT: {{ .GroupLabels.alertname }}'
+        body: |
+          SECURITY INCIDENT DETECTED
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Security Type: {{ .Labels.security }}
+          Runbook: {{ .Annotations.runbook_url }}
+          {{ end }}
+      slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#security-alerts'
+        title: 'SECURITY: {{ .GroupLabels.alertname }}'
+        text: |
+          @channel SECURITY ALERT
+          {{ range .Alerts }}
+          {{ .Annotations.summary }}
+          {{ .Annotations.description }}
+          {{ end }}
+
+---
+# AlertManager Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alertmanager
+  template:
+    metadata:
+      labels:
+        app: alertmanager
+    spec:
+      containers:
+      - name: alertmanager
+        image: prom/alertmanager:v0.25.0
+        args:
+          - '--config.file=/etc/alertmanager/alertmanager.yml'
+          - '--storage.path=/alertmanager'
+          - '--web.external-url=http://alertmanager:9093'
+        ports:
+        - containerPort: 9093
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        volumeMounts:
+        - name: alertmanager-config-volume
+          mountPath: /etc/alertmanager/
+        - name: alertmanager-storage-volume
+          mountPath: /alertmanager
+      volumes:
+      - name: alertmanager-config-volume
+        configMap:
+          name: alertmanager-config
+      - name: alertmanager-storage-volume
+        emptyDir: {}
+
+---
+# AlertManager Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  namespace: monitoring
+spec:
+  selector:
+    app: alertmanager
+  ports:
+    - port: 9093
+      targetPort: 9093
+  type: ClusterIP
+
+---
+# Grafana ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: monitoring
+data:
+  prometheus.yaml: |
+    apiVersion: 1
+    datasources:
+    - name: Prometheus
+      type: prometheus
+      url: http://prometheus:9090
+      access: proxy
+      isDefault: true
+
+---
+# Grafana Dashboards ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+data:
+  dashboard.yaml: |
+    apiVersion: 1
+    providers:
+    - name: 'default'
+      orgId: 1
+      folder: ''
+      type: file
+      disableDeletion: false
+      editable: true
+      options:
+        path: /etc/grafana/provisioning/dashboards
+
+  pno-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "PNO Physics Bench - Production Overview",
+        "tags": ["pno", "production", "ml"],
+        "timezone": "UTC",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Service Availability",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{job=\"pno-physics-bench\",status!~\"5..\"}[24h])) / sum(rate(http_requests_total{job=\"pno-physics-bench\"}[24h]))",
+                "legendFormat": "Availability"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "percentunit",
+                "min": 0.99,
+                "max": 1,
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 0.995},
+                    {"color": "green", "value": 0.999}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+          },
+          {
+            "id": 2,
+            "title": "Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{job=\"pno-physics-bench\"}[5m]))",
+                "legendFormat": "Requests/sec"
+              }
+            ],
+            "yAxes": [
+              {"label": "Requests/sec", "min": 0}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 6, "y": 0}
+          },
+          {
+            "id": 3,
+            "title": "Response Time",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"pno-physics-bench\"}[5m]))",
+                "legendFormat": "P50"
+              },
+              {
+                "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"pno-physics-bench\"}[5m]))",
+                "legendFormat": "P95"
+              },
+              {
+                "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job=\"pno-physics-bench\"}[5m]))",
+                "legendFormat": "P99"
+              }
+            ],
+            "yAxes": [
+              {"label": "Seconds", "min": 0}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+          },
+          {
+            "id": 4,
+            "title": "Error Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{job=\"pno-physics-bench\",status=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=\"pno-physics-bench\"}[5m]))",
+                "legendFormat": "Error Rate"
+              }
+            ],
+            "yAxes": [
+              {"label": "Rate", "min": 0, "max": 0.1}
+            ],
+            "gridPos": {"h": 8, "w": 6, "x": 12, "y": 8}
+          },
+          {
+            "id": 5,
+            "title": "Pod Status",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "kube_deployment_status_replicas_available{deployment=\"pno-physics-bench\"}",
+                "legendFormat": "Available Replicas"
+              },
+              {
+                "expr": "kube_deployment_status_replicas{deployment=\"pno-physics-bench\"}",
+                "legendFormat": "Desired Replicas"
+              }
+            ],
+            "yAxes": [
+              {"label": "Count", "min": 0}
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+          },
+          {
+            "id": 6,
+            "title": "Resource Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "sum(rate(container_cpu_usage_seconds_total{pod=~\"pno-physics-bench-.*\"}[5m]))",
+                "legendFormat": "CPU Usage (cores)"
+              },
+              {
+                "expr": "sum(container_memory_usage_bytes{pod=~\"pno-physics-bench-.*\"}) / 1024 / 1024 / 1024",
+                "legendFormat": "Memory Usage (GB)"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+          },
+          {
+            "id": 7,
+            "title": "Model Inference Metrics",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, rate(pno_inference_duration_seconds_bucket[5m]))",
+                "legendFormat": "Inference P95 Latency"
+              },
+              {
+                "expr": "rate(pno_predictions_total[5m])",
+                "legendFormat": "Predictions/sec"
+              }
+            ],
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
+          },
+          {
+            "id": 8,
+            "title": "Model Quality",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "pno_model_accuracy_score",
+                "legendFormat": "Accuracy"
+              },
+              {
+                "expr": "abs(pno_uncertainty_calibration_error)",
+                "legendFormat": "Calibration Error"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "unit": "short",
+                "thresholds": {
+                  "steps": [
+                    {"color": "red", "value": 0},
+                    {"color": "yellow", "value": 0.9},
+                    {"color": "green", "value": 0.95}
+                  ]
+                }
+              }
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }
+
+---
+# Grafana Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+      - name: grafana
+        image: grafana/grafana:9.5.0
+        ports:
+        - containerPort: 3000
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        env:
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          value: "admin123"  # Change this in production
+        - name: GF_INSTALL_PLUGINS
+          value: "grafana-piechart-panel"
+        volumeMounts:
+        - name: grafana-datasources
+          mountPath: /etc/grafana/provisioning/datasources
+        - name: grafana-dashboards-config
+          mountPath: /etc/grafana/provisioning/dashboards
+        - name: grafana-dashboards
+          mountPath: /etc/grafana/provisioning/dashboards
+        - name: grafana-storage
+          mountPath: /var/lib/grafana
+      volumes:
+      - name: grafana-datasources
+        configMap:
+          name: grafana-datasources
+      - name: grafana-dashboards-config
+        configMap:
+          name: grafana-dashboards
+          items:
+          - key: dashboard.yaml
+            path: dashboard.yaml
+      - name: grafana-dashboards
+        configMap:
+          name: grafana-dashboards
+          items:
+          - key: pno-dashboard.json
+            path: pno-dashboard.json
+      - name: grafana-storage
+        persistentVolumeClaim:
+          claimName: grafana-storage
+
+---
+# Grafana Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  selector:
+    app: grafana
+  ports:
+    - port: 3000
+      targetPort: 3000
+  type: ClusterIP
+
+---
+# Grafana PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-storage
+  namespace: monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: gp3
+
+---
+# Ingress for Grafana and Prometheus
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: monitoring-ingress
+  namespace: monitoring
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: monitoring-auth
+    nginx.ingress.kubernetes.io/auth-realm: 'Authentication Required'
+spec:
+  tls:
+  - hosts:
+    - grafana.company.com
+    - prometheus.company.com
+    - alertmanager.company.com
+    secretName: monitoring-tls
+  rules:
+  - host: grafana.company.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+  - host: prometheus.company.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: prometheus
+            port:
+              number: 9090
+  - host: alertmanager.company.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: alertmanager
+            port:
+              number: 9093

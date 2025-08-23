@@ -1,0 +1,143 @@
+{
+  "errors": {
+    "model": {
+      "invalid_input_dim": "无效的输入维度: {input_dim}。必须是正整数。",
+      "invalid_hidden_dim": "无效的隐藏维度: {hidden_dim}。必须是正整数。",
+      "invalid_modes": "无效的模式: {modes}。必须是正整数。",
+      "forward_failed": "前向传播失败: {error_msg}",
+      "uncertainty_estimation_failed": "不确定性估计失败: {error_msg}",
+      "nan_in_predictions": "在模型预测中检测到NaN值",
+      "inf_in_uncertainties": "在不确定性中检测到无穷值"
+    },
+    "training": {
+      "invalid_learning_rate": "无效的学习率: {lr}。必须为正值。",
+      "invalid_batch_size": "无效的批次大小: {batch_size}。必须是正整数。",
+      "convergence_failed": "训练在{epochs}轮后收敛失败",
+      "gradient_explosion": "检测到梯度爆炸。考虑降低学习率。",
+      "loss_nan": "训练在步骤{step}时损失变为NaN",
+      "checkpoint_save_failed": "保存检查点失败: {error_msg}",
+      "checkpoint_load_failed": "加载检查点失败: {error_msg}"
+    },
+    "data": {
+      "invalid_dataset_path": "无效的数据集路径: {path}",
+      "corrupt_data": "在文件中检测到损坏数据: {filename}",
+      "incompatible_shapes": "不兼容的数据形状: 期望 {expected}，实际 {actual}",
+      "missing_required_field": "缺少必需字段: {field_name}",
+      "invalid_resolution": "无效的分辨率: {resolution}。必须是2的幂。"
+    },
+    "uncertainty": {
+      "negative_uncertainty": "检测到负不确定性值",
+      "zero_uncertainty": "检测到零不确定性。这可能表示模型过度自信。",
+      "calibration_failed": "不确定性校准失败: {error_msg}",
+      "sampling_failed": "不确定性采样失败: {error_msg}",
+      "aggregation_failed": "多模型不确定性聚合失败: {error_msg}"
+    },
+    "physics": {
+      "invalid_reynolds_number": "无效的雷诺数: {re_num}。必须为正值。",
+      "invalid_boundary_conditions": "无效的边界条件: {bc_type}",
+      "physics_loss_diverged": "物理损失发散。检查PDE参数。",
+      "conservation_violation": "检测到守恒定律违反: {violation_type}"
+    },
+    "performance": {
+      "out_of_memory": "内存不足错误。考虑减少批次大小或模型大小。",
+      "cuda_error": "发生CUDA错误: {cuda_error}",
+      "compilation_failed": "模型编译失败: {error_msg}",
+      "kernel_launch_failed": "GPU内核启动失败: {error_msg}"
+    }
+  },
+  "warnings": {
+    "model": {
+      "large_model_size": "检测到大模型大小（{size:.1f}MB）。考虑使用梯度检查点。",
+      "deprecated_parameter": "参数 '{param_name}' 已弃用。请使用 '{new_param}'。",
+      "suboptimal_precision": "使用{precision}精度可能影响不确定性质量。"
+    },
+    "training": {
+      "slow_convergence": "检测到缓慢收敛。考虑调整学习率。",
+      "validation_plateau": "验证损失已停滞{steps}步。",
+      "overfitting_detected": "可能过拟合：验证损失在增加。",
+      "high_uncertainty": "检测到高平均不确定性（{uncertainty:.3f}）。"
+    },
+    "data": {
+      "imbalanced_dataset": "数据集在PDE类型间似乎不平衡。",
+      "low_resolution_data": "低分辨率数据可能影响模型准确性。",
+      "missing_validation_data": "未提供验证数据。使用训练/验证分割。"
+    }
+  },
+  "info": {
+    "model": {
+      "initialization_complete": "模型初始化完成。参数数量: {param_count:,}",
+      "forward_pass_complete": "前向传播完成。形状: {output_shape}",
+      "uncertainty_stats": "不确定性统计 - 平均值: {mean:.4f}，标准差: {std:.4f}",
+      "calibration_score": "不确定性校准分数: {score:.3f}"
+    },
+    "training": {
+      "epoch_complete": "轮次 {epoch}/{total_epochs} - 损失: {loss:.6f}，时间: {time:.2f}秒",
+      "best_model_updated": "在轮次{epoch}更新最佳模型，损失 {loss:.6f}",
+      "training_complete": "训练在{duration:.2f}分钟内成功完成",
+      "checkpoint_saved": "检查点已保存到{path}"
+    },
+    "research": {
+      "hierarchical_decomposition": "分层不确定性分解完成",
+      "multi_fidelity_fusion": "多保真度不确定性融合完成",
+      "spectral_analysis_complete": "频谱不确定性分析完成",
+      "adaptive_computation": "自适应计算路由已激活"
+    },
+    "performance": {
+      "memory_usage": "当前内存使用: {memory_mb:.1f} MB",
+      "inference_speed": "推理速度: {samples_per_sec:.1f} 样本/秒",
+      "optimization_applied": "性能优化 '{opt_name}' 成功应用"
+    }
+  },
+  "ui": {
+    "buttons": {
+      "train": "训练模型",
+      "evaluate": "评估",
+      "save": "保存",
+      "load": "加载",
+      "export": "导出",
+      "cancel": "取消",
+      "continue": "继续",
+      "reset": "重置"
+    },
+    "labels": {
+      "model_type": "模型类型",
+      "learning_rate": "学习率",
+      "batch_size": "批次大小",
+      "epochs": "训练轮次",
+      "uncertainty_type": "不确定性类型",
+      "physics_constraint": "物理约束",
+      "performance_mode": "性能模式"
+    },
+    "tooltips": {
+      "learning_rate": "控制模型学习速度。从1e-3开始。",
+      "uncertainty_type": "要使用的不确定性量化类型。",
+      "physics_constraint": "训练期间强制执行的物理信息约束。"
+    },
+    "tabs": {
+      "training": "训练",
+      "evaluation": "评估",
+      "uncertainty": "不确定性分析",
+      "performance": "性能",
+      "settings": "设置"
+    }
+  },
+  "compliance": {
+    "gdpr": {
+      "data_usage": "此模型仅处理数值PDE数据。不收集个人数据。",
+      "consent_required": "共享不确定性数据需要用户同意",
+      "right_to_explanation": "不确定性估计基于集成方差和校准指标"
+    },
+    "audit": {
+      "model_provenance": "模型在{dataset_name}上训练，使用{training_samples:,}个样本",
+      "uncertainty_methodology": "使用{method}量化不确定性，置信区间为{confidence_level}%",
+      "validation_results": "模型验证 RMSE: {rmse:.6f}，校准: {calibration:.3f}"
+    }
+  },
+  "formats": {
+    "date": "yyyy年MM月dd日",
+    "time": "HH:mm:ss", 
+    "datetime": "yyyy年MM月dd日 HH:mm:ss",
+    "number": "#,###.##",
+    "currency": "¥#,###.##"
+  }
+}
