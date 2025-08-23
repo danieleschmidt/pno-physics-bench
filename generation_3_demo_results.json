@@ -1,0 +1,38 @@
+{
+  "timestamp": 1755983789.2889802,
+  "demo_version": "Generation 3",
+  "system_info": {
+    "cpu_cores": 2,
+    "platform": "linux",
+    "python_version": "3.12.3"
+  },
+  "cache_performance": {
+    "l1_hits": 1000,
+    "l1_misses": 150,
+    "l2_hits": 150,
+    "l2_misses": 0,
+    "total_requests": 1150,
+    "l1_hit_rate": 0.8695652173913043,
+    "overall_hit_rate": 1.0
+  },
+  "analytics_summary": {
+    "timestamp": 1755983789.2889633,
+    "metrics_collected": 1020,
+    "averages": {
+      "cpu_utilization": 52.904057784352865,
+      "memory_utilization": 57.03889054473673,
+      "response_time_p95": 0.1
+    },
+    "anomalies_detected": 2,
+    "recent_anomalies": [
+      "High resource utilization at 1755983788.9471352",
+      "High resource utilization at 1755983789.0978353"
+    ]
+  },
+  "distributed_computing": {
+    "worker_nodes": 2,
+    "load_balancing": "intelligent",
+    "fault_tolerance": true
+  },
+  "status": "Demo completed successfully"
+}
