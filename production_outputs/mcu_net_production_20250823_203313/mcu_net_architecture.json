@@ -1,0 +1,81 @@
+{
+  "name": "MultiModalCausalUncertaintyNetwork",
+  "components": {
+    "causal_attention_layer": {
+      "type": "CausalAttentionLayer",
+      "embed_dim": 256,
+      "num_heads": 8,
+      "temporal_context": 10,
+      "description": "Learns causal relationships between uncertainty modes"
+    },
+    "uncertainty_propagation_graph": {
+      "type": "UncertaintyPropagationGraph",
+      "num_modes": 4,
+      "num_layers": 3,
+      "description": "Graph neural network for uncertainty propagation"
+    },
+    "uncertainty_modes": [
+      {
+        "name": "temporal_uncertainty",
+        "scale_type": "temporal",
+        "causal_parents": [],
+        "causal_children": [
+          "spatial_uncertainty",
+          "physical_uncertainty"
+        ],
+        "weight": 0.3
+      },
+      {
+        "name": "spatial_uncertainty",
+        "scale_type": "spatial",
+        "causal_parents": [
+          "temporal_uncertainty"
+        ],
+        "causal_children": [
+          "spectral_uncertainty"
+        ],
+        "weight": 0.25
+      },
+      {
+        "name": "physical_uncertainty",
+        "scale_type": "physical",
+        "causal_parents": [
+          "temporal_uncertainty"
+        ],
+        "causal_children": [
+          "spectral_uncertainty"
+        ],
+        "weight": 0.25
+      },
+      {
+        "name": "spectral_uncertainty",
+        "scale_type": "spectral",
+        "causal_parents": [
+          "spatial_uncertainty",
+          "physical_uncertainty"
+        ],
+        "causal_children": [],
+        "weight": 0.2
+      }
+    ],
+    "adaptive_calibration": {
+      "enabled": true,
+      "num_layers": 3,
+      "description": "Adaptive uncertainty calibration mechanism"
+    }
+  },
+  "innovations": [
+    "First architecture to model causal uncertainty relationships",
+    "Multi-scale uncertainty integration across four modes",
+    "Adaptive calibration for improved uncertainty quality",
+    "Graph-based uncertainty propagation dynamics"
+  ],
+  "parameters": {
+    "total_estimated": 2847250,
+    "trainable": 2847250,
+    "causal_graph_params": 425000,
+    "attention_params": 890000,
+    "mode_encoders": 680000,
+    "calibration_params": 325000
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "timestamp": "2025-08-23T20:57:36.575636",
+  "generation": 2,
+  "validation_type": "standalone",
+  "test_suites": {
+    "Security Framework Core": {
+      "status": "PARTIAL",
+      "message": "Security core tests: 3/5 passed",
+      "score": 3,
+      "max_score": 5,
+      "details": [
+        "Input sanitization test failed: Potentially dangerous content detected",
+        "Rate limiting: FAIL (allowed 10/10)",
+        "Threat detection: PASS (3/3 detected)",
+        "Audit logging: PASS",
+        "Session management: PASS"
+      ],
+      "success_rate": 0.6
+    },
+    "Infrastructure Management": {
+      "status": "PARTIAL",
+      "message": "Infrastructure core tests: 3/4 passed",
+      "score": 3,
+      "max_score": 4,
+      "details": [
+        "Memory management: PASS",
+        "Configuration management: FAIL (1 errors)",
+        "Resource monitoring: PASS",
+        "Graceful shutdown: PASS"
+      ],
+      "success_rate": 0.75
+    },
+    "Error Handling Framework": {
+      "status": "FAIL",
+      "message": "Error handling core tests: 0/3 passed",
+      "score": 0,
+      "max_score": 3,
+      "details": [
+        "Circuit breaker test failed: No module named 'numpy'",
+        "Failure analysis test failed: No module named 'numpy'",
+        "Recovery mechanisms test failed: No module named 'numpy'"
+      ],
+      "success_rate": 0.0
+    },
+    "Configuration Management": {
+      "status": "PASS",
+      "message": "Configuration management tests: 3/3 passed",
+      "score": 3,
+      "max_score": 3,
+      "details": [
+        "Configuration schema validation: PASS",
+        "Configuration file operations: PASS",
+        "Configuration hot reloading: PASS"
+      ],
+      "success_rate": 1.0
+    },
+    "Logging and Audit Trail": {
+      "status": "PASS",
+      "message": "Logging system tests: 3/3 passed",
+      "score": 3,
+      "max_score": 3,
+      "details": [
+        "Structured logging: PASS",
+        "Log file creation: PASS (5 files)",
+        "Audit trail persistence: PASS"
+      ],
+      "success_rate": 1.0
+    },
+    "Robustness Integration": {
+      "status": "PASS",
+      "message": "Robustness integration tests: 4/4 passed",
+      "score": 4,
+      "max_score": 4,
+      "details": [
+        "Security + Infrastructure integration: PASS",
+        "Error Handling + Logging integration: PASS",
+        "Multi-component workflow: PASS",
+        "Stress test integration: PASS (16/20 successful)"
+      ],
+      "success_rate": 1.0
+    }
+  },
+  "overall_status": "NEEDS_MINOR_IMPROVEMENTS",
+  "integration_score": 16,
+  "max_score": 22,
+  "success_rate": 0.7272727272727273,
+  "execution_time_seconds": 0.06974530220031738
+}

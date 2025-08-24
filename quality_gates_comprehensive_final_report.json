@@ -1,0 +1,270 @@
+{
+  "timestamp": 1755984706.9549131,
+  "project_root": "/root/repo",
+  "quality_gates": {
+    "Code Quality & Testing": {
+      "passed": false,
+      "score": 25.31645569620253,
+      "coverage_percentage": 25.31645569620253,
+      "test_files_count": 18,
+      "source_files_count": 79,
+      "issues": [
+        "Test coverage 25.3% below required 85%",
+        "Code quality score 38.9% below required 80%"
+      ],
+      "details": {
+        "code_quality_score": 38.8641425389755
+      }
+    },
+    "Security Validation": {
+      "passed": false,
+      "score": 20,
+      "vulnerabilities": {
+        "critical": [],
+        "high": [
+          {
+            "file": "src/pno_physics_bench/benchmarks.py",
+            "pattern": "unsafe_eval",
+            "matches": 2,
+            "severity": "high"
+          },
+          {
+            "file": "src/pno_physics_bench/cli.py",
+            "pattern": "unsafe_eval",
+            "matches": 1,
+            "severity": "high"
+          },
+          {
+            "file": "src/pno_physics_bench/models.py",
+            "pattern": "unsafe_eval",
+            "matches": 1,
+            "severity": "high"
+          },
+          {
+            "file": "src/pno_physics_bench/optimization.py",
+            "pattern": "unsafe_eval",
+            "matches": 4,
+            "severity": "high"
+          },
+          {
+            "file": "src/pno_physics_bench/optimization_engine.py",
+            "pattern": "unsafe_eval",
+            "matches": 2,
+            "severity": "high"
+          },
+          {
+            "file": "src/pno_physics_bench/performance_optimization.py",
+            "pattern": "unsafe_eval",
+            "matches": 1,
+            "severity": "high"
+          },
+          {
+            "file": "src/pno_physics_bench/quantum_enhanced_pno.py",
+            "pattern": "unsafe_eval",
+            "matches": 1,
+            "severity": "high"
+          },
+          {
+            "file": "src/pno_physics_bench/uncertainty.py",
+            "pattern": "unsafe_eval",
+            "matches": 4,
+            "severity": "high"
+          },
+          {
+            "file": "src/pno_physics_bench/production_robust_models.py",
+            "pattern": "unsafe_eval",
+            "matches": 1,
+            "severity": "high"
+          },
+          {
+            "file": "src/pno_physics_bench/monitoring/advanced_health_checks.py",
+            "pattern": "unsafe_eval",
+            "matches": 1,
+            "severity": "high"
+          },
+          {
+            "file": "src/pno_physics_bench/research/comparative_experimental_suite.py",
+            "pattern": "unsafe_eval",
+            "matches": 1,
+            "severity": "high"
+          },
+          {
+            "file": "src/pno_physics_bench/research/continual_learning_uncertainty.py",
+            "pattern": "unsafe_eval",
+            "matches": 1,
+            "severity": "high"
+          },
+          {
+            "file": "src/pno_physics_bench/research/multi_fidelity.py",
+            "pattern": "unsafe_eval",
+            "matches": 1,
+            "severity": "high"
+          },
+          {
+            "file": "src/pno_physics_bench/research/performance_optimizers.py",
+            "pattern": "unsafe_eval",
+            "matches": 2,
+            "severity": "high"
+          },
+          {
+            "file": "src/pno_physics_bench/scaling/distributed_inference_optimization.py",
+            "pattern": "unsafe_eval",
+            "matches": 1,
+            "severity": "high"
+          },
+          {
+            "file": "src/pno_physics_bench/scaling/distributed_optimization.py",
+            "pattern": "unsafe_eval",
+            "matches": 1,
+            "severity": "high"
+          },
+          {
+            "file": "src/pno_physics_bench/scaling/memory_efficient_training.py",
+            "pattern": "unsafe_eval",
+            "matches": 1,
+            "severity": "high"
+          },
+          {
+            "file": "src/pno_physics_bench/training/callbacks.py",
+            "pattern": "unsafe_eval",
+            "matches": 1,
+            "severity": "high"
+          },
+          {
+            "file": "src/pno_physics_bench/training/trainer.py",
+            "pattern": "unsafe_eval",
+            "matches": 2,
+            "severity": "high"
+          },
+          {
+            "file": "src/pno_physics_bench/uncertainty/ensemble_methods.py",
+            "pattern": "unsafe_eval",
+            "matches": 2,
+            "severity": "high"
+          },
+          {
+            "file": "src/pno_physics_bench/utils/profiling.py",
+            "pattern": "unsafe_eval",
+            "matches": 1,
+            "severity": "high"
+          }
+        ],
+        "medium": [],
+        "low": []
+      },
+      "compliance_checks": {
+        "input_validation": 1.0,
+        "secure_communication": 0.3260869565217391,
+        "access_control": 1.0,
+        "logging_monitoring": 1.0
+      },
+      "issues": [
+        "21 high-severity vulnerabilities (limit: 5)"
+      ]
+    },
+    "Performance Benchmarking": {
+      "passed": false,
+      "score": 83.33333333333333,
+      "response_times": {},
+      "throughput_metrics": {},
+      "resource_usage": {},
+      "issues": [],
+      "avg_response_time": 56.23608017817372,
+      "p95_response_time": 84.35412026726058,
+      "p99_response_time": 112.47216035634744,
+      "requests_per_second": 484.4097995545657,
+      "complexity_ratio": 0.062360801781737196,
+      "total_functions": 1796,
+      "complex_functions": 112,
+      "monitoring_score": 0.5
+    },
+    "Documentation Validation": {
+      "passed": true,
+      "score": 94.5979020979021,
+      "documentation_files": [
+        "README.md",
+        "API_DOCUMENTATION.md",
+        "ARCHITECTURE.md",
+        "DEPLOYMENT.md",
+        "CONTRIBUTING.md"
+      ],
+      "api_documentation": {
+        "score": 1.0,
+        "indicators": {
+          "openapi_spec": true,
+          "endpoint_docs": true,
+          "example_usage": true,
+          "response_schemas": true
+        },
+        "api_files": [
+          "API_DOCUMENTATION.md"
+        ]
+      },
+      "docstring_coverage": 0.8199300699300699,
+      "issues": []
+    },
+    "Production Readiness": {
+      "passed": false,
+      "score": 80.43478260869566,
+      "deployment_config": {
+        "score": 0.7999999999999999,
+        "found_configs": [
+          "Dockerfile",
+          "docker-compose.yml",
+          "deployment/",
+          "requirements.txt"
+        ],
+        "issues": [
+          "Missing deployment configurations: ['kubernetes.yaml']"
+        ]
+      },
+      "monitoring_setup": {
+        "score": 0.6000000000000001,
+        "found_components": [
+          "monitoring/",
+          "logs/",
+          "monitoring.py",
+          "monitoring_advanced.py",
+          "monitoring_server.py",
+          "comprehensive_system_monitoring.py",
+          "production_monitoring.py"
+        ],
+        "issues": [
+          "Insufficient monitoring setup for production"
+        ]
+      },
+      "error_handling": {
+        "score": 0.817391304347826,
+        "error_handling_ratio": 0.6956521739130435,
+        "custom_exceptions": true,
+        "logging_present": true,
+        "issues": []
+      },
+      "scalability": {
+        "score": 1.0,
+        "found_indicators": [
+          "distributed",
+          "scaling",
+          "cache",
+          "async",
+          "parallel"
+        ],
+        "issues": []
+      },
+      "issues": [
+        "Missing deployment configurations: ['kubernetes.yaml']",
+        "Insufficient monitoring setup for production"
+      ]
+    }
+  },
+  "overall_score": 60.73649474722672,
+  "production_ready": false,
+  "critical_issues": [
+    "Test coverage 25.3% below required 85%",
+    "Code quality score 38.9% below required 80%",
+    "21 high-severity vulnerabilities (limit: 5)",
+    "Missing deployment configurations: ['kubernetes.yaml']",
+    "Insufficient monitoring setup for production"
+  ],
+  "recommendations": []
+}

@@ -9,7 +9,7 @@
 
 import time
 import threading
-import pickle
+import json  # SECURITY: Using json instead of pickle
 import hashlib
 import weakref
 from typing import Any, Dict, Optional, Callable, Tuple

@@ -1,0 +1,381 @@
+# Global Multi-Region Kubernetes Deployment for PNO Physics Bench
+# Supports deployment across AWS EKS, GCP GKE, and Azure AKS
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pno-physics-bench
+  labels:
+    app: pno-physics-bench
+    tier: production
+    compliance: "gdpr,ccpa,pdpa"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pno-physics-bench
+  namespace: pno-physics-bench
+  labels:
+    app: pno-physics-bench
+    version: v1.0.0
+    tier: production
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: pno-physics-bench
+  template:
+    metadata:
+      labels:
+        app: pno-physics-bench
+        version: v1.0.0
+        tier: production
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: pno-physics-bench
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      containers:
+      - name: pno-physics-bench
+        image: pno-physics/pno-physics-bench:v1.0.0
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        - containerPort: 8080
+          name: metrics
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: REGION
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['region']
+        - name: COMPLIANCE_MODE
+          valueFrom:
+            configMapKeyRef:
+              name: pno-config
+              key: compliance_mode
+        - name: I18N_DEFAULT_LOCALE
+          valueFrom:
+            configMapKeyRef:
+              name: pno-config
+              key: default_locale
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: pno-secrets
+              key: database_url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: pno-secrets
+              key: redis_url
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+            ephemeral-storage: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+            ephemeral-storage: 10Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: cache-volume
+          mountPath: /app/cache
+        - name: models-volume
+          mountPath: /app/models
+          readOnly: true
+        - name: logs-volume
+          mountPath: /app/logs
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+      volumes:
+      - name: config-volume
+        configMap:
+          name: pno-config
+      - name: cache-volume
+        emptyDir:
+          sizeLimit: 1Gi
+      - name: models-volume
+        persistentVolumeClaim:
+          claimName: pno-models-pvc
+      - name: logs-volume
+        emptyDir:
+          sizeLimit: 2Gi
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - pno-physics-bench
+              topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node.kubernetes.io/instance-type
+                operator: In
+                values:
+                - c5.large
+                - c5.xlarge
+                - c5.2xlarge
+                - n1-standard-2
+                - n1-standard-4
+                - Standard_D2s_v3
+                - Standard_D4s_v3
+      tolerations:
+      - key: "pno-workload"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pno-physics-bench
+  namespace: pno-physics-bench
+  labels:
+    app: pno-physics-bench
+    tier: production
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/azure-load-balancer-resource-group: pno-rg
+    cloud.google.com/load-balancer-type: External
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: metrics
+  selector:
+    app: pno-physics-bench
+  sessionAffinity: None
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pno-physics-bench
+  namespace: pno-physics-bench
+  labels:
+    app: pno-physics-bench
+  annotations:
+    # AWS IAM Role for Service Accounts
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT:role/pno-physics-bench-role
+    # GCP Workload Identity
+    iam.gke.io/gcp-service-account: pno-physics-bench@PROJECT.iam.gserviceaccount.com
+    # Azure Workload Identity
+    azure.workload.identity/client-id: "client-id"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: pno-physics-bench
+  name: pno-physics-bench
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pno-physics-bench
+  namespace: pno-physics-bench
+subjects:
+- kind: ServiceAccount
+  name: pno-physics-bench
+  namespace: pno-physics-bench
+roleRef:
+  kind: Role
+  name: pno-physics-bench
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pno-config
+  namespace: pno-physics-bench
+  labels:
+    app: pno-physics-bench
+data:
+  compliance_mode: "production"
+  default_locale: "en"
+  log_level: "INFO"
+  max_workers: "4"
+  cache_ttl: "3600"
+  model_cache_size: "1GB"
+  monitoring_enabled: "true"
+  tracing_enabled: "true"
+  metrics_interval: "30"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pno-models-pvc
+  namespace: pno-physics-bench
+  labels:
+    app: pno-physics-bench
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: fast-ssd
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: pno-physics-bench-hpa
+  namespace: pno-physics-bench
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pno-physics-bench
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: custom_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 20
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pno-physics-bench-pdb
+  namespace: pno-physics-bench
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: pno-physics-bench
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pno-physics-bench-network-policy
+  namespace: pno-physics-bench
+spec:
+  podSelector:
+    matchLabels:
+      app: pno-physics-bench
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - podSelector:
+        matchLabels:
+          app: monitoring
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 8080
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: database
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443  # HTTPS outbound
+    - protocol: TCP
+      port: 53   # DNS
+    - protocol: UDP
+      port: 53   # DNS

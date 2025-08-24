@@ -1,0 +1,143 @@
+{
+  "errors": {
+    "model": {
+      "invalid_input_dim": "無効な入力次元: {input_dim}。正の整数である必要があります。",
+      "invalid_hidden_dim": "無効な隠れ層次元: {hidden_dim}。正の整数である必要があります。",
+      "invalid_modes": "無効なモード: {modes}。正の整数である必要があります。",
+      "forward_failed": "順伝播に失敗しました: {error_msg}",
+      "uncertainty_estimation_failed": "不確実性推定に失敗しました: {error_msg}",
+      "nan_in_predictions": "モデル予測でNaN値が検出されました",
+      "inf_in_uncertainties": "不確実性で無限値が検出されました"
+    },
+    "training": {
+      "invalid_learning_rate": "無効な学習率: {lr}。正の値である必要があります。",
+      "invalid_batch_size": "無効なバッチサイズ: {batch_size}。正の整数である必要があります。",
+      "convergence_failed": "{epochs}エポック後に訓練収束に失敗しました",
+      "gradient_explosion": "勾配爆発が検出されました。学習率を下げることを検討してください。",
+      "loss_nan": "ステップ{step}で訓練中にロスがNaNになりました",
+      "checkpoint_save_failed": "チェックポイントの保存に失敗しました: {error_msg}",
+      "checkpoint_load_failed": "チェックポイントの読み込みに失敗しました: {error_msg}"
+    },
+    "data": {
+      "invalid_dataset_path": "無効なデータセットパス: {path}",
+      "corrupt_data": "ファイル内で破損データが検出されました: {filename}",
+      "incompatible_shapes": "互換性のないデータ形状: 期待値 {expected}、実際値 {actual}",
+      "missing_required_field": "必須フィールドが不足しています: {field_name}",
+      "invalid_resolution": "無効な解像度: {resolution}。2の累乗である必要があります。"
+    },
+    "uncertainty": {
+      "negative_uncertainty": "負の不確実性値が検出されました",
+      "zero_uncertainty": "ゼロ不確実性が検出されました。これはモデルの過信頼を示す可能性があります。",
+      "calibration_failed": "不確実性較正に失敗しました: {error_msg}",
+      "sampling_failed": "不確実性サンプリングに失敗しました: {error_msg}",
+      "aggregation_failed": "マルチモデル不確実性集約に失敗しました: {error_msg}"
+    },
+    "physics": {
+      "invalid_reynolds_number": "無効なレイノルズ数: {re_num}。正の値である必要があります。",
+      "invalid_boundary_conditions": "無効な境界条件: {bc_type}",
+      "physics_loss_diverged": "物理ロスが発散しました。PDEパラメータを確認してください。",
+      "conservation_violation": "保存則違反が検出されました: {violation_type}"
+    },
+    "performance": {
+      "out_of_memory": "メモリ不足エラー。バッチサイズまたはモデルサイズを減らすことを検討してください。",
+      "cuda_error": "CUDAエラーが発生しました: {cuda_error}",
+      "compilation_failed": "モデルコンパイルに失敗しました: {error_msg}",
+      "kernel_launch_failed": "GPUカーネル起動に失敗しました: {error_msg}"
+    }
+  },
+  "warnings": {
+    "model": {
+      "large_model_size": "大きなモデルサイズが検出されました（{size:.1f}MB）。勾配チェックポイントの使用を検討してください。",
+      "deprecated_parameter": "パラメータ '{param_name}' は非推奨です。代わりに '{new_param}' を使用してください。",
+      "suboptimal_precision": "{precision}精度の使用は不確実性品質に影響する可能性があります。"
+    },
+    "training": {
+      "slow_convergence": "収束が遅いことが検出されました。学習率の調整を検討してください。",
+      "validation_plateau": "検証ロスが{steps}ステップ間停滞しています。",
+      "overfitting_detected": "過学習の可能性：検証ロスが増加しています。",
+      "high_uncertainty": "高い平均不確実性（{uncertainty:.3f}）が検出されました。"
+    },
+    "data": {
+      "imbalanced_dataset": "データセットがPDEタイプ間で不均衡のようです。",
+      "low_resolution_data": "低解像度データはモデル精度に影響する可能性があります。",
+      "missing_validation_data": "検証データが提供されていません。訓練/検証分割を使用します。"
+    }
+  },
+  "info": {
+    "model": {
+      "initialization_complete": "モデル初期化完了。パラメータ数: {param_count:,}",
+      "forward_pass_complete": "順伝播完了。形状: {output_shape}",
+      "uncertainty_stats": "不確実性統計 - 平均: {mean:.4f}、標準偏差: {std:.4f}",
+      "calibration_score": "不確実性較正スコア: {score:.3f}"
+    },
+    "training": {
+      "epoch_complete": "エポック {epoch}/{total_epochs} - ロス: {loss:.6f}、時間: {time:.2f}秒",
+      "best_model_updated": "エポック{epoch}でベストモデルが更新されました。ロス {loss:.6f}",
+      "training_complete": "訓練が{duration:.2f}分で正常に完了しました",
+      "checkpoint_saved": "チェックポイントが{path}に保存されました"
+    },
+    "research": {
+      "hierarchical_decomposition": "階層的不確実性分解完了",
+      "multi_fidelity_fusion": "マルチフィデリティ不確実性融合完了",
+      "spectral_analysis_complete": "スペクトル不確実性解析完了",
+      "adaptive_computation": "適応的計算ルーティング有効化"
+    },
+    "performance": {
+      "memory_usage": "現在のメモリ使用量: {memory_mb:.1f} MB",
+      "inference_speed": "推論速度: {samples_per_sec:.1f} サンプル/秒",
+      "optimization_applied": "パフォーマンス最適化 '{opt_name}' が正常に適用されました"
+    }
+  },
+  "ui": {
+    "buttons": {
+      "train": "モデル訓練",
+      "evaluate": "評価",
+      "save": "保存",
+      "load": "読み込み",
+      "export": "エクスポート",
+      "cancel": "キャンセル",
+      "continue": "続行",
+      "reset": "リセット"
+    },
+    "labels": {
+      "model_type": "モデルタイプ",
+      "learning_rate": "学習率",
+      "batch_size": "バッチサイズ",
+      "epochs": "エポック",
+      "uncertainty_type": "不確実性タイプ",
+      "physics_constraint": "物理制約",
+      "performance_mode": "パフォーマンスモード"
+    },
+    "tooltips": {
+      "learning_rate": "モデルの学習速度を制御します。1e-3から始めてください。",
+      "uncertainty_type": "使用する不確実性定量化のタイプ。",
+      "physics_constraint": "訓練中に適用される物理情報制約。"
+    },
+    "tabs": {
+      "training": "訓練",
+      "evaluation": "評価",
+      "uncertainty": "不確実性解析",
+      "performance": "パフォーマンス",
+      "settings": "設定"
+    }
+  },
+  "compliance": {
+    "gdpr": {
+      "data_usage": "このモデルは数値PDEデータのみを処理します。個人データは収集されません。",
+      "consent_required": "不確実性データ共有にはユーザー同意が必要",
+      "right_to_explanation": "不確実性推定はアンサンブル分散と較正メトリクスに基づきます"
+    },
+    "audit": {
+      "model_provenance": "モデルは{dataset_name}で{training_samples:,}サンプルを使用して訓練されました",
+      "uncertainty_methodology": "{method}を使用して{confidence_level}%信頼区間で不確実性を定量化",
+      "validation_results": "モデル検証 RMSE: {rmse:.6f}、較正: {calibration:.3f}"
+    }
+  },
+  "formats": {
+    "date": "yyyy年MM月dd日",
+    "time": "HH:mm:ss",
+    "datetime": "yyyy年MM月dd日 HH:mm:ss",
+    "number": "#,###.##",
+    "currency": "¥#,###"
+  }
+}

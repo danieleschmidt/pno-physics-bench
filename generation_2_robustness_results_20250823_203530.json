@@ -1,0 +1,49 @@
+{
+  "timestamp": "2025-08-23T20:35:30.190607",
+  "tests": {
+    "logging": {
+      "status": "pass",
+      "message": "Logging system operational"
+    },
+    "validation": {
+      "status": "fail",
+      "error": "No module named 'numpy'"
+    },
+    "error_handling": {
+      "status": "partial",
+      "summary": {
+        "total_errors": 4,
+        "error_types": {
+          "ModuleNotFoundError": 1,
+          "ValueError": 1,
+          "RuntimeError": 1,
+          "SecurityError": 1
+        },
+        "last_error": {
+          "error_type": "SecurityError",
+          "error_message": "Test security error",
+          "context": "test_context_2",
+          "timestamp": "2025-08-23T20:35:30.197461",
+          "stack_trace": "NoneType: None\n"
+        },
+        "error_rate": 0.8
+      }
+    },
+    "security": {
+      "status": "fail",
+      "error": "Required config field missing: input_dim"
+    },
+    "health_monitoring": {
+      "status": "pass",
+      "health_status": "warning",
+      "checks": 3
+    },
+    "integration": {
+      "status": "pass",
+      "score": "100.0%",
+      "components_working": 5,
+      "total_components": 5
+    }
+  },
+  "overall_status": "needs_improvement"
+}

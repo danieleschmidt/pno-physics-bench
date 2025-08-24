@@ -1,0 +1,94 @@
+{
+  "timestamp": "2025-08-23T20:55:09.344302",
+  "generation": 2,
+  "test_suites": {
+    "Enhanced Error Handling": {
+      "status": "FAIL",
+      "message": "Error handling tests: 1/5 passed",
+      "score": 1,
+      "max_score": 5,
+      "details": [
+        "Circuit breaker test failed: No module named 'numpy'",
+        "Retry mechanism test failed: No module named 'numpy'",
+        "Fault tolerance manager not available",
+        "Error classification test failed: No module named 'numpy'",
+        "Graceful degradation under load: PASS"
+      ],
+      "success_rate": 0.2
+    },
+    "Production Monitoring": {
+      "status": "FAIL",
+      "message": "Monitoring system not available",
+      "score": 0,
+      "max_score": 4,
+      "details": [
+        "Monitoring system initialization failed"
+      ]
+    },
+    "Security Framework": {
+      "status": "PASS",
+      "message": "Security tests: 4.0/5 passed",
+      "score": 4.0,
+      "max_score": 5,
+      "details": [
+        "Input sanitization failed: Potentially dangerous content detected",
+        "Threat detection: PASS (4/4 detected)",
+        "Rate limiting: PASS",
+        "Audit logging: PASS",
+        "Session management: PASS"
+      ],
+      "success_rate": 0.8
+    },
+    "Quality Gates Pipeline": {
+      "status": "FAIL",
+      "message": "Quality gates pipeline not available",
+      "score": 0,
+      "max_score": 3,
+      "details": [
+        "Quality gates pipeline initialization failed"
+      ]
+    },
+    "Infrastructure Management": {
+      "status": "PASS",
+      "message": "Infrastructure tests: 4/4 passed",
+      "score": 4,
+      "max_score": 4,
+      "details": [
+        "Memory management: PASS",
+        "Configuration management: PASS",
+        "Resource monitoring: PASS",
+        "Infrastructure health reporting: PASS"
+      ],
+      "success_rate": 1.0
+    },
+    "End-to-End Integration": {
+      "status": "FAIL",
+      "message": "E2E integration tests: 1/3 passed",
+      "score": 1,
+      "max_score": 3,
+      "details": [
+        "E2E request lifecycle failed: Threats detected: ['MALICIOUS_INPUT']",
+        "Cross-component integration: FAIL (0/3 integrations working)",
+        "Failure recovery integration: PASS"
+      ],
+      "success_rate": 0.3333333333333333
+    },
+    "Production Resilience": {
+      "status": "PASS",
+      "message": "Production resilience tests: 3/3 passed",
+      "score": 3,
+      "max_score": 3,
+      "details": [
+        "Concurrent load handling: PASS (17/20 successful)",
+        "Memory pressure resilience: PASS",
+        "Error cascade prevention: PASS"
+      ],
+      "success_rate": 1.0
+    }
+  },
+  "integration_score": 11.0,
+  "max_score": 27,
+  "overall_status": "NOT_PRODUCTION_READY",
+  "success_rate": 0.4074074074074074,
+  "execution_time_seconds": 0.13720130920410156
+}

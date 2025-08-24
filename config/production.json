@@ -1,0 +1,40 @@
+{
+  "model_type": "PNO",
+  "input_dim": 64,
+  "hidden_dim": 256,
+  "batch_size": 32,
+  "learning_rate": 0.001,
+  "epochs": 100,
+  "device": "cpu",
+  "uncertainty_enabled": true,
+  "monitoring": {
+    "metrics_collection_interval": 30,
+    "health_check_interval": 60,
+    "alert_thresholds": {
+      "memory_percent": 85,
+      "cpu_percent": 80,
+      "error_rate": 0.05
+    }
+  },
+  "security": {
+    "rate_limit_requests_per_minute": 100,
+    "session_timeout_seconds": 3600,
+    "audit_log_retention_days": 30,
+    "threat_detection_enabled": true
+  },
+  "infrastructure": {
+    "memory_limit_mb": 4096,
+    "graceful_shutdown_timeout": 30,
+    "resource_monitoring_enabled": true,
+    "auto_gc_threshold_mb": 3072
+  },
+  "quality_gates": {
+    "validation_enabled": true,
+    "performance_thresholds": {
+      "min_accuracy": 0.7,
+      "max_latency_ms": 1000,
+      "max_memory_mb": 2048
+    },
+    "rollback_on_critical_failure": true
+  }
+}

@@ -1,0 +1,356 @@
+# Multi-Cloud Storage Configuration for PNO Physics Bench
+# Supports AWS EBS, GCP Persistent Disks, and Azure Managed Disks
+
+# AWS EBS Storage Class
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: aws-gp3-fast
+  labels:
+    cloud-provider: aws
+    performance-tier: fast
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  iops: "3000"
+  throughput: "125"
+  fsType: ext4
+  encrypted: "true"
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+---
+# GCP Persistent Disk Storage Class
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gcp-ssd-fast
+  labels:
+    cloud-provider: gcp
+    performance-tier: fast
+provisioner: pd.csi.storage.gke.io
+parameters:
+  type: pd-ssd
+  replication-type: regional-pd
+  fstype: ext4
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+---
+# Azure Managed Disk Storage Class
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: azure-premium-fast
+  labels:
+    cloud-provider: azure
+    performance-tier: fast
+provisioner: disk.csi.azure.com
+parameters:
+  skuName: Premium_LRS
+  fsType: ext4
+  cachingmode: ReadOnly
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+---
+# Generic Fast SSD Storage Class (for multi-cloud compatibility)
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast-ssd
+  labels:
+    performance-tier: fast
+    app: pno-physics-bench
+# Use the appropriate provisioner based on cloud provider
+# This will be set during deployment based on the target cloud
+provisioner: kubernetes.io/aws-ebs  # Will be dynamically replaced
+parameters:
+  type: gp3
+  fsType: ext4
+  encrypted: "true"
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+---
+# Models Storage - High Performance for ML Model Artifacts
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pno-models-pvc
+  namespace: pno-physics-bench
+  labels:
+    app: pno-physics-bench
+    data-type: models
+    backup-required: "true"
+    compliance: "gdpr,ccpa,pdpa"
+  annotations:
+    # AWS specific annotations
+    volume.beta.kubernetes.io/storage-class: aws-gp3-fast
+    # GCP specific annotations
+    volume.beta.kubernetes.io/storage-provisioner: pd.csi.storage.gke.io
+    # Azure specific annotations
+    volume.beta.kubernetes.io/storage-provisioner: disk.csi.azure.com
+    # Backup annotations
+    backup.kubernetes.io/schedule: "0 2 * * *"
+    backup.kubernetes.io/retention: "30d"
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: fast-ssd
+---
+# Training Data Storage - Large Volume for Training Datasets
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pno-training-data-pvc
+  namespace: pno-physics-bench
+  labels:
+    app: pno-physics-bench
+    data-type: training
+    backup-required: "true"
+    retention-policy: "7-years"
+  annotations:
+    backup.kubernetes.io/schedule: "0 1 * * 0"  # Weekly backup
+    backup.kubernetes.io/retention: "2555d"      # 7 years for compliance
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 500Gi
+  storageClassName: fast-ssd
+---
+# Logs Storage - High Write Performance for Application Logs
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pno-logs-pvc
+  namespace: pno-physics-bench
+  labels:
+    app: pno-physics-bench
+    data-type: logs
+    backup-required: "true"
+    compliance-audit: "true"
+  annotations:
+    backup.kubernetes.io/schedule: "0 0 * * *"  # Daily backup
+    backup.kubernetes.io/retention: "90d"
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: fast-ssd
+---
+# Cache Storage - Fast Access for Redis and Application Cache
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pno-cache-pvc
+  namespace: pno-physics-bench
+  labels:
+    app: pno-physics-bench
+    data-type: cache
+    backup-required: "false"
+  annotations:
+    backup.kubernetes.io/schedule: "disabled"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: fast-ssd
+---
+# Multi-Region Backup Storage Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-storage-config
+  namespace: pno-physics-bench
+  labels:
+    app: pno-physics-bench
+    component: backup
+data:
+  # AWS S3 configuration
+  aws_s3_config.yaml: |
+    provider: aws
+    bucket: pno-physics-bench-backups
+    region: us-west-2
+    encryption: AES256
+    versioning: enabled
+    lifecycle_policy:
+      transition_to_ia: 30
+      transition_to_glacier: 90
+      expire: 2555  # 7 years
+    cross_region_replication:
+      enabled: true
+      destination_bucket: pno-physics-bench-backups-eu
+      destination_region: eu-west-1
+  
+  # GCP Cloud Storage configuration
+  gcp_gcs_config.yaml: |
+    provider: gcp
+    bucket: pno-physics-bench-backups-gcp
+    location: us-central1
+    storage_class: REGIONAL
+    encryption: google_managed
+    versioning: enabled
+    lifecycle_policy:
+      delete_after_days: 2555  # 7 years
+    cross_region_replication:
+      enabled: true
+      destination_bucket: pno-physics-bench-backups-eu-gcp
+      destination_location: europe-west1
+  
+  # Azure Blob Storage configuration
+  azure_blob_config.yaml: |
+    provider: azure
+    storage_account: pnophysicsbenchbackups
+    container: backups
+    location: eastus
+    tier: Hot
+    encryption: microsoft_managed
+    versioning: enabled
+    lifecycle_policy:
+      transition_to_cool: 30
+      transition_to_archive: 90
+      delete_after_days: 2555  # 7 years
+    cross_region_replication:
+      enabled: true
+      destination_account: pnophysicsbenchbackupseu
+      destination_location: westeurope
+---
+# Velero Backup Configuration for Kubernetes Resources
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: velero-backup-config
+  namespace: pno-physics-bench
+  labels:
+    app: pno-physics-bench
+    component: backup
+data:
+  backup_schedule.yaml: |
+    # Daily application backup
+    apiVersion: velero.io/v1
+    kind: Schedule
+    metadata:
+      name: pno-daily-backup
+      namespace: velero
+    spec:
+      schedule: "0 2 * * *"
+      template:
+        includedNamespaces:
+        - pno-physics-bench
+        excludedResources:
+        - events
+        - events.events.k8s.io
+        storageLocation: default
+        volumeSnapshotLocations:
+        - default
+        ttl: 720h0m0s  # 30 days
+    
+    # Weekly full backup
+    apiVersion: velero.io/v1
+    kind: Schedule
+    metadata:
+      name: pno-weekly-backup
+      namespace: velero
+    spec:
+      schedule: "0 1 * * 0"
+      template:
+        includedNamespaces:
+        - pno-physics-bench
+        storageLocation: default
+        volumeSnapshotLocations:
+        - default
+        ttl: 2160h0m0s  # 90 days
+---
+# Storage Monitoring and Alerting
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: storage-monitoring-config
+  namespace: pno-physics-bench
+  labels:
+    app: pno-physics-bench
+    component: monitoring
+data:
+  storage_alerts.yaml: |
+    groups:
+    - name: pno-storage-alerts
+      rules:
+      - alert: PVCStorageRunningLow
+        expr: (kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PVC storage running low"
+          description: "PVC {{ $labels.persistentvolumeclaim }} in namespace {{ $labels.namespace }} is {{ $value }}% full"
+      
+      - alert: PVCStorageCritical
+        expr: (kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes) * 100 < 5
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PVC storage critically low"
+          description: "PVC {{ $labels.persistentvolumeclaim }} in namespace {{ $labels.namespace }} is {{ $value }}% full"
+      
+      - alert: BackupFailed
+        expr: increase(velero_backup_failure_total[1h]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup failed"
+          description: "Velero backup has failed for PNO Physics Bench"
+  
+  storage_dashboard.json: |
+    {
+      "dashboard": {
+        "title": "PNO Physics Bench Storage Monitoring",
+        "panels": [
+          {
+            "title": "PVC Usage",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "(kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes) * 100",
+                "legendFormat": "{{ persistentvolumeclaim }} usage %"
+              }
+            ]
+          },
+          {
+            "title": "Storage IOPS",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(container_fs_reads_total[5m]) + rate(container_fs_writes_total[5m])",
+                "legendFormat": "{{ persistentvolumeclaim }} IOPS"
+              }
+            ]
+          },
+          {
+            "title": "Backup Status",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "velero_backup_success_total",
+                "legendFormat": "Successful Backups"
+              },
+              {
+                "expr": "velero_backup_failure_total", 
+                "legendFormat": "Failed Backups"
+              }
+            ]
+          }
+        ]
+      }
+    }
