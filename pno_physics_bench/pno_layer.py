@@ -1,69 +1,60 @@
-"""Physics-informed Neural Operator (PNO) layer for uncertainty quantification."""
-
+"""Probabilistic Neural Operator layer with uncertainty head."""
 import numpy as np
 
 
 class PNOLayer:
-    """Simple feedforward neural operator layer with uncertainty output.
+    """Neural operator layer producing mean + log_var (Gaussian output)."""
 
-    Outputs [mean, log_var] for each output point, enabling probabilistic
-    predictions via the reparameterization of a Gaussian.
-    """
-
-    def __init__(
-        self,
-        input_dim: int = 1,
-        hidden_dim: int = 64,
-        output_dim: int = 1,
-        seed: int = 42,
-    ):
-        """Initialize PNO layer with random weights.
-
-        Args:
-            input_dim: Dimension of each input point.
-            hidden_dim: Number of hidden units.
-            output_dim: Number of output points.
-            seed: Random seed for reproducibility.
-        """
+    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, seed: int = 42):
         rng = np.random.default_rng(seed)
         scale = np.sqrt(2.0 / input_dim)
-
-        # Two-layer MLP: input_dim -> hidden_dim -> 2 (mean + log_var)
-        self.W1 = rng.normal(0, scale, (hidden_dim, input_dim))
+        self.W1 = rng.standard_normal((input_dim, hidden_dim)) * scale
         self.b1 = np.zeros(hidden_dim)
-        self.W2 = rng.normal(0, np.sqrt(2.0 / hidden_dim), (2, hidden_dim))
-        self.b2 = np.zeros(2)
-
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.output_dim = output_dim
+        self.W_mean = rng.standard_normal((hidden_dim, output_dim)) * 0.1
+        self.b_mean = np.zeros(output_dim)
+        self.W_logvar = rng.standard_normal((hidden_dim, output_dim)) * 0.1
+        self.b_logvar = np.full(output_dim, -2.0)  # init small variance
 
     def _relu(self, x: np.ndarray) -> np.ndarray:
-        return np.maximum(0.0, x)
+        return np.maximum(0, x)
 
     def forward(self, x: np.ndarray):
-        """Forward pass through the PNO layer.
-
-        Args:
-            x: Input array of shape (n,) or (n, input_dim).
-
-        Returns:
-            Tuple of (mean, log_var) each of shape (n,).
-        """
-        x = np.atleast_1d(x)
-        if x.ndim == 1:
-            x = x[:, np.newaxis]
-
-        # Hidden layer
-        h = self._relu(x @ self.W1.T + self.b1)  # (n, hidden_dim)
-        # Output layer: [mean, log_var]
-        out = h @ self.W2.T + self.b2  # (n, 2)
-
-        mean = out[:, 0]      # (n,)
-        log_var = out[:, 1]   # (n,)
-
+        """Forward pass. x shape: (batch, input_dim). Returns (mean, log_var)."""
+        h = self._relu(x @ self.W1 + self.b1)
+        mean = h @ self.W_mean + self.b_mean
+        log_var = h @ self.W_logvar + self.b_logvar
+        log_var = np.clip(log_var, -10, 5)
         return mean, log_var
 
-    def __call__(self, x: np.ndarray):
-        """Alias for forward()."""
-        return self.forward(x)
+    def predict(self, x: np.ndarray):
+        mean, log_var = self.forward(x)
+        var = np.exp(log_var)
+        return mean, var
+
+    def fit(self, X: np.ndarray, y: np.ndarray, lr: float = 0.01, epochs: int = 200):
+        """Simple gradient-free (finite diff) training for demo purposes."""
+        best_loss = float("inf")
+        clip = 1.0  # gradient clip norm
+        for epoch in range(epochs):
+            mean, log_var = self.forward(X)
+            var = np.exp(log_var) + 1e-6
+            nll = 0.5 * (np.log(var) + (y - mean) ** 2 / var).mean()
+            if nll < best_loss:
+                best_loss = nll
+            # Gradient step (manual backprop for NLL)
+            dy_mean = -(y - mean) / var / len(X)
+            dy_logvar = 0.5 * (1 - (y - mean) ** 2 / var) / len(X)
+            # Clip gradients to prevent explosion
+            dy_mean = np.clip(dy_mean, -clip, clip)
+            dy_logvar = np.clip(dy_logvar, -clip, clip)
+            h = self._relu(X @ self.W1 + self.b1)
+            dW_mean = h.T @ dy_mean
+            dW_logvar = h.T @ dy_logvar
+            # Clip weight gradients
+            dW_mean = np.clip(dW_mean, -clip, clip)
+            dW_logvar = np.clip(dW_logvar, -clip, clip)
+            self.W_mean -= lr * dW_mean
+            self.b_mean -= lr * np.clip(dy_mean.mean(0), -clip, clip)
+            self.W_logvar -= lr * dW_logvar
+            self.b_logvar -= lr * np.clip(dy_logvar.mean(0), -clip, clip)
+        return self

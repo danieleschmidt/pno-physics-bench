@@ -1,225 +1,91 @@
-"""Benchmark runner comparing GP and PNO on 1D PDE problems."""
-
+"""Benchmark runner comparing GP baseline vs PNO on 1D PDEs."""
 import numpy as np
-from typing import Dict, Any, Optional
-
-from .gp_baseline import GaussianProcessBaseline
-from .pno_layer import PNOLayer
-from .metrics import UncertaintyMetrics
-
-
-def _solve_heat_1d(
-    n_x: int = 50,
-    n_t: int = 100,
-    L: float = 1.0,
-    T: float = 0.1,
-    nu: float = 0.01,
-) -> tuple:
-    """Solve 1D heat equation u_t = nu * u_xx using explicit finite differences.
-
-    IC: u(x, 0) = sin(pi * x / L)
-    BC: u(0, t) = u(L, t) = 0
-
-    Args:
-        n_x: Number of spatial grid points.
-        n_t: Number of time steps.
-        L: Domain length.
-        T: Final time.
-        nu: Diffusivity coefficient.
-
-    Returns:
-        Tuple (x, u_final) of spatial grid and solution at t=T.
-    """
-    dx = L / (n_x + 1)
-    dt = T / n_t
-    # Stability: r = nu * dt / dx^2 <= 0.5
-    r = nu * dt / dx ** 2
-
-    x = np.linspace(dx, L - dx, n_x)
-    u = np.sin(np.pi * x / L)
-
-    for _ in range(n_t):
-        u_new = u.copy()
-        u_new[1:-1] = u[1:-1] + r * (u[2:] - 2 * u[1:-1] + u[:-2])
-        u = u_new
-
-    return x, u
+from typing import Dict, Any
+from pno_physics_bench.gp_baseline import GaussianProcessBaseline
+from pno_physics_bench.pno_layer import PNOLayer
+from pno_physics_bench.metrics import UncertaintyMetrics
 
 
-def _solve_burgers_1d(
-    n_x: int = 50,
-    n_t: int = 200,
-    L: float = 2.0 * np.pi,
-    T: float = 0.5,
-    nu: float = 0.1,
-) -> tuple:
-    """Solve 1D viscous Burgers equation u_t + u*u_x = nu*u_xx.
+def _heat_solution(x: np.ndarray, t: float = 0.1, n_terms: int = 20) -> np.ndarray:
+    """Analytical solution to 1D heat eq u_t = u_xx, u(x,0)=sin(pi*x), x in [0,1]."""
+    return np.sin(np.pi * x) * np.exp(-(np.pi**2) * t)
 
-    IC: u(x, 0) = -sin(x)
-    BC: periodic
 
-    Uses explicit upwind scheme for the advection term and central differences
-    for the diffusion term.
-
-    Args:
-        n_x: Number of spatial grid points.
-        n_t: Number of time steps.
-        L: Domain length (2*pi for periodic).
-        T: Final time.
-        nu: Viscosity coefficient.
-
-    Returns:
-        Tuple (x, u_final) of spatial grid and solution at t=T.
-    """
-    dx = L / n_x
-    dt = T / n_t
-    r = nu * dt / dx ** 2
-
-    x = np.linspace(0, L - dx, n_x)
-    u = -np.sin(x)
-
-    for _ in range(n_t):
-        # Advection: upwind scheme
-        u_pos = np.maximum(u, 0.0)
-        u_neg = np.minimum(u, 0.0)
-        adv = (u_pos * (u - np.roll(u, 1)) + u_neg * (np.roll(u, -1) - u)) / dx
-
-        # Diffusion: central differences (periodic)
-        diff = (np.roll(u, -1) - 2 * u + np.roll(u, 1)) / dx ** 2
-
-        u = u - dt * adv + nu * dt * diff
-
-    return x, u
+def _burgers_approx(x: np.ndarray, t: float = 0.1) -> np.ndarray:
+    """Simple approximation to Burgers equation solution."""
+    return np.sin(np.pi * x) * np.exp(-t) / (1 + t * np.abs(np.sin(np.pi * x)))
 
 
 class BenchmarkRunner:
-    """Runs 1D PDE benchmarks comparing GP baseline vs PNO.
+    """Compare GP baseline vs PNO on 1D heat and Burgers equations."""
 
-    Generates (input, output) pairs from PDE solvers, then evaluates
-    each model's predictive uncertainty using NLL, CRPS, and coverage.
-    """
-
-    def __init__(
-        self,
-        n_train: int = 30,
-        n_test: int = 20,
-        gp_length_scale: float = 0.3,
-        gp_noise: float = 1e-3,
-        pno_hidden_dim: int = 64,
-        seed: int = 0,
-    ):
-        """Initialize benchmark runner.
-
-        Args:
-            n_train: Number of training points.
-            n_test: Number of test points.
-            gp_length_scale: GP kernel length scale.
-            gp_noise: GP observation noise.
-            pno_hidden_dim: Hidden units in PNO layer.
-            seed: Random seed.
-        """
+    def __init__(self, n_train: int = 30, n_test: int = 100, seed: int = 0):
         self.n_train = n_train
         self.n_test = n_test
-        self.gp_length_scale = gp_length_scale
-        self.gp_noise = gp_noise
-        self.pno_hidden_dim = pno_hidden_dim
-        self.seed = seed
+        self.rng = np.random.default_rng(seed)
         self.metrics = UncertaintyMetrics()
+        self.results: Dict[str, Any] = {}
 
-    def _eval_model_gp(
-        self, X_train, y_train, X_test, y_test
-    ) -> Dict[str, float]:
-        gp = GaussianProcessBaseline(
-            length_scale=self.gp_length_scale, noise=self.gp_noise
-        )
-        gp.fit(X_train, y_train)
-        mu, var = gp.predict(X_test)
-        sigma = np.sqrt(np.maximum(var, 1e-12))
+    def _make_dataset(self, fn, noise: float = 0.02):
+        X_train = np.sort(self.rng.uniform(0, 1, self.n_train))
+        y_train = fn(X_train) + self.rng.normal(0, noise, self.n_train)
+        X_test = np.linspace(0, 1, self.n_test)
+        y_test = fn(X_test)
+        return X_train, y_train, X_test, y_test
+
+    def _eval_model(self, name: str, mean: np.ndarray, var: np.ndarray, y_test: np.ndarray):
         return {
-            "nll": UncertaintyMetrics.nll(y_test, mu, sigma),
-            "crps": UncertaintyMetrics.crps(y_test, mu, sigma),
-            "coverage": UncertaintyMetrics.coverage(y_test, mu, sigma),
+            "model": name,
+            "nll": self.metrics.nll_gaussian(y_test, mean, var),
+            "crps": self.metrics.crps_gaussian(y_test, mean, var),
+            "coverage_90": self.metrics.coverage_probability(y_test, mean, var, alpha=0.9),
+            "rmse": float(np.sqrt(np.mean((y_test - mean) ** 2))),
         }
 
-    def _eval_model_pno(
-        self, X_train, y_train, X_test, y_test
-    ) -> Dict[str, float]:
-        pno = PNOLayer(
-            input_dim=1,
-            hidden_dim=self.pno_hidden_dim,
-            output_dim=1,
-            seed=self.seed,
-        )
-        mu, log_var = pno.forward(X_test)
-        sigma = np.sqrt(np.exp(np.clip(log_var, -10, 10)))
-        return {
-            "nll": UncertaintyMetrics.nll(y_test, mu, sigma),
-            "crps": UncertaintyMetrics.crps(y_test, mu, sigma),
-            "coverage": UncertaintyMetrics.coverage(y_test, mu, sigma),
-        }
+    def run_heat(self):
+        X_tr, y_tr, X_te, y_te = self._make_dataset(_heat_solution)
+        # GP
+        gp = GaussianProcessBaseline(length_scale=0.3)
+        gp.fit(X_tr, y_tr)
+        gp_mean, gp_var = gp.predict(X_te)
+        # PNO
+        X_feat = np.column_stack([X_te, X_te**2])
+        X_tr_feat = np.column_stack([X_tr, X_tr**2])
+        pno = PNOLayer(input_dim=2, hidden_dim=32, output_dim=1)
+        pno.fit(X_tr_feat, y_tr[:, None], lr=0.05, epochs=300)
+        pno_mean, pno_var = pno.predict(X_feat)
+        pno_mean = pno_mean.ravel()
+        pno_var = pno_var.ravel()
+        # Calibration
+        cal_exp, cal_obs = self.metrics.calibration_data(y_te, gp_mean, gp_var)
+        self.results["heat_gp"] = self._eval_model("GP-heat", gp_mean, gp_var, y_te)
+        self.results["heat_pno"] = self._eval_model("PNO-heat", pno_mean, pno_var, y_te)
+        self.results["heat_calibration"] = {"expected": cal_exp, "observed": cal_obs}
 
-    def run_heat(self) -> Dict[str, Any]:
-        """Run heat equation benchmark.
-
-        Returns:
-            Dict with keys 'x', 'u', 'train_idx', 'test_idx', 'gp', 'pno'.
-        """
-        x, u = _solve_heat_1d()
-        rng = np.random.default_rng(self.seed)
-        n = len(x)
-        idx = rng.permutation(n)
-        train_idx = idx[: self.n_train]
-        test_idx = idx[self.n_train: self.n_train + self.n_test]
-
-        X_train = x[train_idx]
-        y_train = u[train_idx]
-        X_test = x[test_idx]
-        y_test = u[test_idx]
-
-        return {
-            "x": x,
-            "u": u,
-            "train_idx": train_idx,
-            "test_idx": test_idx,
-            "gp": self._eval_model_gp(X_train, y_train, X_test, y_test),
-            "pno": self._eval_model_pno(X_train, y_train, X_test, y_test),
-        }
-
-    def run_burgers(self) -> Dict[str, Any]:
-        """Run Burgers equation benchmark.
-
-        Returns:
-            Dict with keys 'x', 'u', 'train_idx', 'test_idx', 'gp', 'pno'.
-        """
-        x, u = _solve_burgers_1d()
-        rng = np.random.default_rng(self.seed + 1)
-        n = len(x)
-        idx = rng.permutation(n)
-        train_idx = idx[: self.n_train]
-        test_idx = idx[self.n_train: self.n_train + self.n_test]
-
-        X_train = x[train_idx]
-        y_train = u[train_idx]
-        X_test = x[test_idx]
-        y_test = u[test_idx]
-
-        return {
-            "x": x,
-            "u": u,
-            "train_idx": train_idx,
-            "test_idx": test_idx,
-            "gp": self._eval_model_gp(X_train, y_train, X_test, y_test),
-            "pno": self._eval_model_pno(X_train, y_train, X_test, y_test),
-        }
+    def run_burgers(self):
+        X_tr, y_tr, X_te, y_te = self._make_dataset(_burgers_approx)
+        gp = GaussianProcessBaseline(length_scale=0.3)
+        gp.fit(X_tr, y_tr)
+        gp_mean, gp_var = gp.predict(X_te)
+        X_feat = np.column_stack([X_te, np.sin(np.pi * X_te)])
+        X_tr_feat = np.column_stack([X_tr, np.sin(np.pi * X_tr)])
+        pno = PNOLayer(input_dim=2, hidden_dim=32, output_dim=1)
+        pno.fit(X_tr_feat, y_tr[:, None], lr=0.05, epochs=300)
+        pno_mean, pno_var = pno.predict(X_feat)
+        pno_mean = pno_mean.ravel()
+        pno_var = pno_var.ravel()
+        self.results["burgers_gp"] = self._eval_model("GP-burgers", gp_mean, gp_var, y_te)
+        self.results["burgers_pno"] = self._eval_model("PNO-burgers", pno_mean, pno_var, y_te)
 
     def run_all(self) -> Dict[str, Any]:
-        """Run all benchmarks and return consolidated results.
+        self.run_heat()
+        self.run_burgers()
+        return self.results
 
-        Returns:
-            Dict with 'heat' and 'burgers' sub-dicts, each containing
-            GP and PNO metric results.
-        """
-        return {
-            "heat": self.run_heat(),
-            "burgers": self.run_burgers(),
-        }
+    def summary(self) -> str:
+        lines = ["=== PNO Physics Bench Results ==="]
+        for k, v in self.results.items():
+            if k.endswith("_calibration"):
+                continue
+            lines.append(f"{k}: NLL={v['nll']:.4f} CRPS={v['crps']:.4f} Cov90={v['coverage_90']:.2f} RMSE={v['rmse']:.4f}")
+        return "\n".join(lines)

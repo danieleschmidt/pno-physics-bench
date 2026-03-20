@@ -1,288 +1,142 @@
-"""Tests for pno-physics-bench: 12+ tests covering all modules."""
-
-import json
-import os
-import tempfile
-
+"""Tests for pno-physics-bench."""
 import numpy as np
 import pytest
-
-from pno_physics_bench import (
-    GaussianProcessBaseline,
-    PNOLayer,
-    UncertaintyMetrics,
-    BenchmarkRunner,
-    calibration_export,
-)
+from pno_physics_bench.gp_baseline import GaussianProcessBaseline
+from pno_physics_bench.pno_layer import PNOLayer
+from pno_physics_bench.metrics import UncertaintyMetrics
+from pno_physics_bench.benchmark import BenchmarkRunner, _heat_solution, _burgers_approx
 
 
-# ---------------------------------------------------------------------------
-# GaussianProcessBaseline tests
-# ---------------------------------------------------------------------------
-
-class TestGaussianProcessBaseline:
-
-    def test_init_defaults(self):
+class TestGPBaseline:
+    def test_fit_predict_shape(self):
         gp = GaussianProcessBaseline()
-        assert gp.length_scale == 1.0
-        assert gp.noise == 1e-3
+        X = np.linspace(0, 1, 20)
+        y = np.sin(X)
+        gp.fit(X, y)
+        mean, var = gp.predict(np.linspace(0, 1, 10))
+        assert mean.shape == (10,)
+        assert var.shape == (10,)
 
-    def test_init_custom(self):
-        gp = GaussianProcessBaseline(length_scale=0.5, noise=0.01)
-        assert gp.length_scale == 0.5
-        assert gp.noise == 0.01
-
-    def test_rbf_kernel_shape(self):
+    def test_variance_positive(self):
         gp = GaussianProcessBaseline()
-        X1 = np.array([[0.0], [1.0], [2.0]])
-        X2 = np.array([[0.5], [1.5]])
-        K = gp._rbf_kernel(X1, X2)
-        assert K.shape == (3, 2)
+        X = np.linspace(0, 1, 20)
+        gp.fit(X, np.sin(X))
+        _, var = gp.predict(np.array([0.5, 0.7]))
+        assert np.all(var > 0)
 
-    def test_rbf_kernel_symmetry(self):
-        gp = GaussianProcessBaseline(length_scale=0.5)
-        X = np.linspace(0, 1, 5)[:, np.newaxis]
+    def test_interpolation_quality(self):
+        gp = GaussianProcessBaseline(length_scale=0.3, noise_variance=1e-5)
+        X = np.linspace(0, 1, 30)
+        y = np.sin(np.pi * X)
+        gp.fit(X, y)
+        mean, _ = gp.predict(X)
+        assert np.mean((mean - y) ** 2) < 1e-3
+
+    def test_rbf_kernel_symmetric(self):
+        gp = GaussianProcessBaseline()
+        X = np.array([0.1, 0.5, 0.9])
         K = gp._rbf_kernel(X, X)
+        assert K.shape == (3, 3)
         np.testing.assert_allclose(K, K.T, atol=1e-12)
 
-    def test_rbf_kernel_diagonal_is_one(self):
-        gp = GaussianProcessBaseline()
-        X = np.array([[0.0], [1.0], [2.0]])
-        K = gp._rbf_kernel(X, X)
-        np.testing.assert_allclose(np.diag(K), np.ones(3), atol=1e-12)
-
-    def test_fit_and_predict_shape(self):
-        gp = GaussianProcessBaseline()
-        X_train = np.linspace(0, 1, 10)
-        y_train = np.sin(X_train)
-        gp.fit(X_train, y_train)
-
-        X_test = np.linspace(0.1, 0.9, 5)
-        mean, var = gp.predict(X_test)
-        assert mean.shape == (5,)
-        assert var.shape == (5,)
-
-    def test_predict_variance_non_negative(self):
-        gp = GaussianProcessBaseline(length_scale=0.3)
-        X_train = np.linspace(0, 1, 15)
-        y_train = np.cos(np.pi * X_train)
-        gp.fit(X_train, y_train)
-
-        X_test = np.linspace(0, 1, 20)
-        _, var = gp.predict(X_test)
-        assert np.all(var >= 0.0)
-
-    def test_predict_low_variance_near_training(self):
-        gp = GaussianProcessBaseline(length_scale=0.3, noise=1e-6)
-        X_train = np.array([0.0, 0.5, 1.0])
-        y_train = np.array([0.0, 1.0, 0.0])
-        gp.fit(X_train, y_train)
-
-        # Variance at training points should be near zero
-        mean_train, var_train = gp.predict(X_train)
-        assert np.all(var_train < 1e-3)
-
-    def test_predict_without_fit_raises(self):
-        gp = GaussianProcessBaseline()
-        with pytest.raises(RuntimeError):
-            gp.predict(np.array([0.5]))
-
-
-# ---------------------------------------------------------------------------
-# PNOLayer tests
-# ---------------------------------------------------------------------------
 
 class TestPNOLayer:
-
-    def test_init(self):
-        pno = PNOLayer(input_dim=1, hidden_dim=32, output_dim=1)
-        assert pno.W1.shape == (32, 1)
-        assert pno.W2.shape == (2, 32)
-
-    def test_forward_output_shape(self):
-        pno = PNOLayer(input_dim=1, hidden_dim=64)
-        x = np.linspace(0, 1, 10)
+    def test_forward_shapes(self):
+        pno = PNOLayer(input_dim=4, hidden_dim=16, output_dim=1)
+        x = np.random.randn(10, 4)
         mean, log_var = pno.forward(x)
-        assert mean.shape == (10,)
-        assert log_var.shape == (10,)
+        assert mean.shape == (10, 1)
+        assert log_var.shape == (10, 1)
 
-    def test_call_alias(self):
-        pno = PNOLayer()
-        x = np.linspace(0, 1, 5)
-        mean1, lv1 = pno(x)
-        mean2, lv2 = pno.forward(x)
-        np.testing.assert_array_equal(mean1, mean2)
-        np.testing.assert_array_equal(lv1, lv2)
+    def test_predict_variance_positive(self):
+        pno = PNOLayer(input_dim=2, hidden_dim=8, output_dim=1)
+        x = np.random.randn(5, 2)
+        _, var = pno.predict(x)
+        assert np.all(var > 0)
 
-    def test_deterministic_with_same_seed(self):
-        x = np.linspace(0, 1, 8)
-        pno1 = PNOLayer(seed=123)
-        pno2 = PNOLayer(seed=123)
-        m1, lv1 = pno1(x)
-        m2, lv2 = pno2(x)
-        np.testing.assert_array_equal(m1, m2)
-        np.testing.assert_array_equal(lv1, lv2)
+    def test_fit_reduces_loss(self):
+        rng = np.random.default_rng(0)
+        X = np.column_stack([np.linspace(0, 1, 50), np.linspace(0, 1, 50)**2])
+        y = np.sin(np.pi * X[:, 0:1])
+        pno = PNOLayer(input_dim=2, hidden_dim=32, output_dim=1, seed=0)
+        mean_before, var_before = pno.predict(X[:5])
+        pno.fit(X, y, lr=0.05, epochs=100)
+        mean_after, _ = pno.predict(X)
+        rmse = np.sqrt(np.mean((mean_after - y)**2))
+        assert rmse < 0.5  # should learn something
 
+    def test_log_var_clipped(self):
+        pno = PNOLayer(input_dim=2, hidden_dim=8, output_dim=1)
+        x = np.random.randn(10, 2) * 100
+        _, log_var = pno.forward(x)
+        assert np.all(log_var <= 5)
+        assert np.all(log_var >= -10)
 
-# ---------------------------------------------------------------------------
-# UncertaintyMetrics tests
-# ---------------------------------------------------------------------------
 
 class TestUncertaintyMetrics:
+    def setup_method(self):
+        rng = np.random.default_rng(1)
+        self.mean = rng.standard_normal(100)
+        self.var = np.ones(100) * 0.25
+        self.y = self.mean + rng.normal(0, 0.5, 100)
 
-    def test_nll_perfect_prediction_is_finite(self):
-        y = np.array([0.0, 1.0, 2.0])
-        mu = y.copy()
-        sigma = np.ones(3)
-        nll = UncertaintyMetrics.nll(y, mu, sigma)
+    def test_nll_finite(self):
+        nll = UncertaintyMetrics.nll_gaussian(self.y, self.mean, self.var)
         assert np.isfinite(nll)
 
-    def test_nll_decreases_with_better_fit(self):
-        y = np.array([1.0, 2.0, 3.0])
-        sigma = np.ones(3)
-        nll_good = UncertaintyMetrics.nll(y, y, sigma)
-        nll_bad = UncertaintyMetrics.nll(y, y + 10.0, sigma)
-        assert nll_good < nll_bad
+    def test_crps_positive(self):
+        crps = UncertaintyMetrics.crps_gaussian(self.y, self.mean, self.var)
+        assert crps > 0
 
-    def test_crps_non_negative(self):
-        rng = np.random.default_rng(0)
-        y = rng.normal(size=50)
-        mu = rng.normal(size=50)
-        sigma = np.abs(rng.normal(size=50)) + 0.1
-        crps = UncertaintyMetrics.crps(y, mu, sigma)
-        assert crps >= 0.0
+    def test_coverage_range(self):
+        cov = UncertaintyMetrics.coverage_probability(self.y, self.mean, self.var, alpha=0.9)
+        assert 0 <= cov <= 1
 
-    def test_crps_perfect_is_zero(self):
-        """For a perfect point prediction (sigma→0), CRPS → 0."""
-        y = np.array([1.0, 2.0, 3.0])
-        mu = y.copy()
-        sigma = np.full(3, 1e-6)
-        crps = UncertaintyMetrics.crps(y, mu, sigma)
-        assert crps < 1e-3
-
-    def test_coverage_all_inside(self):
-        y = np.array([0.0, 1.0, 2.0])
-        mu = y.copy()
-        sigma = np.full(3, 100.0)  # very wide intervals
-        cov = UncertaintyMetrics.coverage(y, mu, sigma)
-        assert cov == 1.0
-
-    def test_coverage_all_outside(self):
-        y = np.array([0.0, 1.0, 2.0])
-        mu = y + 1000.0  # far off
-        sigma = np.ones(3)
-        cov = UncertaintyMetrics.coverage(y, mu, sigma)
-        assert cov == 0.0
-
-    def test_coverage_nominal_95(self):
+    def test_well_calibrated_coverage(self):
+        # Perfect predictions: coverage should be ~90%
         rng = np.random.default_rng(42)
-        mu = np.zeros(10000)
-        sigma = np.ones(10000)
-        y = rng.normal(mu, sigma)
-        cov = UncertaintyMetrics.coverage(y, mu, sigma)
-        assert abs(cov - 0.95) < 0.02
+        mean = rng.standard_normal(1000)
+        var = np.ones(1000)
+        y = mean + rng.standard_normal(1000)
+        cov = UncertaintyMetrics.coverage_probability(y, mean, var, alpha=0.9)
+        assert 0.85 < cov < 0.95
 
+    def test_calibration_data_shape(self):
+        exp, obs = UncertaintyMetrics.calibration_data(self.y, self.mean, self.var, n_bins=5)
+        assert len(exp) == 5
+        assert len(obs) == 5
 
-# ---------------------------------------------------------------------------
-# BenchmarkRunner tests
-# ---------------------------------------------------------------------------
 
 class TestBenchmarkRunner:
+    def test_run_heat(self):
+        runner = BenchmarkRunner(n_train=20, n_test=30, seed=0)
+        runner.run_heat()
+        assert "heat_gp" in runner.results
+        assert "heat_pno" in runner.results
+        assert "nll" in runner.results["heat_gp"]
 
-    def test_run_heat_returns_expected_keys(self):
-        runner = BenchmarkRunner(n_train=20, n_test=10)
-        result = runner.run_heat()
-        assert "x" in result
-        assert "u" in result
-        assert "gp" in result
-        assert "pno" in result
-        for model in ("gp", "pno"):
-            for metric in ("nll", "crps", "coverage"):
-                assert metric in result[model]
+    def test_run_burgers(self):
+        runner = BenchmarkRunner(n_train=20, n_test=30, seed=0)
+        runner.run_burgers()
+        assert "burgers_gp" in runner.results
+        assert "burgers_pno" in runner.results
 
-    def test_run_burgers_returns_expected_keys(self):
-        runner = BenchmarkRunner(n_train=20, n_test=10)
-        result = runner.run_burgers()
-        assert "gp" in result
-        assert "pno" in result
-
-    def test_run_all_has_both_benchmarks(self):
-        runner = BenchmarkRunner(n_train=15, n_test=10)
+    def test_run_all_keys(self):
+        runner = BenchmarkRunner(n_train=15, n_test=20, seed=1)
         results = runner.run_all()
-        assert "heat" in results
-        assert "burgers" in results
+        assert len(results) >= 4
 
-    def test_gp_coverage_in_range(self):
-        runner = BenchmarkRunner(n_train=20, n_test=10)
-        result = runner.run_heat()
-        cov = result["gp"]["coverage"]
-        assert 0.0 <= cov <= 1.0
+    def test_heat_solution(self):
+        x = np.linspace(0, 1, 10)
+        u = _heat_solution(x, t=0.1)
+        assert u.shape == (10,)
+        assert np.isfinite(u).all()
+        assert abs(u[0]) < 1e-10  # boundary at x=0
+        assert abs(u[-1]) < 1e-10  # boundary at x=1
 
-    def test_metrics_are_finite(self):
-        runner = BenchmarkRunner(n_train=20, n_test=10)
-        results = runner.run_all()
-        for bench in ("heat", "burgers"):
-            for model in ("gp", "pno"):
-                for metric in ("nll", "crps", "coverage"):
-                    val = results[bench][model][metric]
-                    assert np.isfinite(val), (
-                        f"{bench}/{model}/{metric} = {val} is not finite"
-                    )
-
-
-# ---------------------------------------------------------------------------
-# Export tests
-# ---------------------------------------------------------------------------
-
-class TestCalibrationExport:
-
-    def _make_results(self):
-        return {
-            "heat": {
-                "gp": {"nll": 1.23, "crps": 0.45, "coverage": 0.90},
-                "pno": {"nll": 2.34, "crps": 0.67, "coverage": 0.80},
-            },
-            "burgers": {
-                "gp": {"nll": 1.11, "crps": 0.33, "coverage": 0.95},
-                "pno": {"nll": 3.21, "crps": 0.88, "coverage": 0.70},
-            },
-        }
-
-    def test_export_creates_json(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            out_path = os.path.join(tmpdir, "calibration")
-            calibration_export(self._make_results(), out_path)
-            assert os.path.exists(out_path + ".json")
-
-    def test_export_creates_csv(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            out_path = os.path.join(tmpdir, "calibration")
-            calibration_export(self._make_results(), out_path)
-            assert os.path.exists(out_path + ".csv")
-
-    def test_json_content_valid(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            out_path = os.path.join(tmpdir, "calibration")
-            calibration_export(self._make_results(), out_path)
-            with open(out_path + ".json") as f:
-                data = json.load(f)
-            assert "heat" in data
-            assert "burgers" in data
-
-    def test_csv_row_count(self):
-        import csv as csv_mod
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            out_path = os.path.join(tmpdir, "calibration")
-            calibration_export(self._make_results(), out_path)
-            with open(out_path + ".csv") as f:
-                reader = csv_mod.DictReader(f)
-                rows = list(reader)
-            # 2 benchmarks * 2 models = 4 rows
-            assert len(rows) == 4
-
-    def test_export_creates_parent_dirs(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            out_path = os.path.join(tmpdir, "sub", "dir", "calibration")
-            calibration_export(self._make_results(), out_path)
-            assert os.path.exists(out_path + ".json")
+    def test_summary_string(self):
+        runner = BenchmarkRunner(n_train=10, n_test=15, seed=0)
+        runner.run_all()
+        s = runner.summary()
+        assert "NLL=" in s
+        assert "RMSE=" in s

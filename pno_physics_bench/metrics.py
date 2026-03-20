@@ -1,102 +1,47 @@
-"""Uncertainty quantification metrics for probabilistic predictions."""
-
+"""Uncertainty quantification metrics."""
 import numpy as np
-from scipy.special import erf
+from typing import Tuple
 
 
 class UncertaintyMetrics:
-    """Collection of uncertainty quantification metrics.
-
-    All metrics assume Gaussian predictive distributions parameterized
-    by mean (mu) and standard deviation (sigma).
-    """
+    """Compute NLL, CRPS, and coverage probability."""
 
     @staticmethod
-    def nll(y: np.ndarray, mu: np.ndarray, sigma: np.ndarray) -> float:
-        """Negative log-likelihood under a Gaussian predictive distribution.
-
-        NLL = sum_i [ 0.5*log(2*pi*sigma_i^2) + (y_i - mu_i)^2 / (2*sigma_i^2) ]
-
-        Args:
-            y: True targets of shape (n,).
-            mu: Predicted means of shape (n,).
-            sigma: Predicted standard deviations of shape (n,).
-
-        Returns:
-            Scalar NLL value.
-        """
-        y = np.asarray(y, dtype=float)
-        mu = np.asarray(mu, dtype=float)
-        sigma = np.asarray(sigma, dtype=float)
-        sigma = np.maximum(sigma, 1e-8)  # numerical stability
-
-        return float(np.sum(
-            0.5 * np.log(2 * np.pi * sigma ** 2)
-            + (y - mu) ** 2 / (2 * sigma ** 2)
-        ))
+    def nll_gaussian(y_true: np.ndarray, mean: np.ndarray, var: np.ndarray) -> float:
+        """Negative log-likelihood under Gaussian."""
+        var = np.maximum(var, 1e-10)
+        nll = 0.5 * (np.log(2 * np.pi * var) + (y_true - mean) ** 2 / var)
+        return float(nll.mean())
 
     @staticmethod
-    def crps(y: np.ndarray, mu: np.ndarray, sigma: np.ndarray) -> float:
-        """Continuous Ranked Probability Score (CRPS) for Gaussian forecasts.
-
-        CRPS = mean_i [ sigma_i * (z_i * erf(z_i/sqrt(2))
-                        + sqrt(2/pi) * exp(-z_i^2/2)
-                        - |y_i - mu_i| / sigma_i) ]
-
-        where z_i = (y_i - mu_i) / sigma_i.
-
-        Lower is better. CRPS == 0 means perfect forecast.
-
-        Args:
-            y: True targets of shape (n,).
-            mu: Predicted means of shape (n,).
-            sigma: Predicted standard deviations of shape (n,).
-
-        Returns:
-            Scalar mean CRPS value.
-        """
-        y = np.asarray(y, dtype=float)
-        mu = np.asarray(mu, dtype=float)
-        sigma = np.asarray(sigma, dtype=float)
-        sigma = np.maximum(sigma, 1e-8)
-
-        z = (y - mu) / sigma
-        score = sigma * (
-            z * erf(z / np.sqrt(2))
-            + np.sqrt(2.0 / np.pi) * np.exp(-0.5 * z ** 2)
-            - np.abs(y - mu) / sigma
-        )
-        return float(np.mean(score))
+    def crps_gaussian(y_true: np.ndarray, mean: np.ndarray, var: np.ndarray) -> float:
+        """Continuous Ranked Probability Score for Gaussian predictive distribution."""
+        from scipy.stats import norm as scipy_norm
+        std = np.sqrt(np.maximum(var, 1e-10))
+        z = (y_true - mean) / std
+        crps = std * (z * (2 * scipy_norm.cdf(z) - 1) + 2 * scipy_norm.pdf(z) - 1.0 / np.sqrt(np.pi))
+        return float(crps.mean())
 
     @staticmethod
-    def coverage(
-        y: np.ndarray,
-        mu: np.ndarray,
-        sigma: np.ndarray,
-        z_score: float = 1.96,
-    ) -> float:
-        """Prediction interval coverage probability.
+    def coverage_probability(y_true: np.ndarray, mean: np.ndarray, var: np.ndarray, alpha: float = 0.9) -> float:
+        """Empirical coverage of (1-alpha) central prediction interval."""
+        from scipy.stats import norm as scipy_norm
+        std = np.sqrt(np.maximum(var, 1e-10))
+        z = scipy_norm.ppf(0.5 + alpha / 2)
+        lower = mean - z * std
+        upper = mean + z * std
+        covered = np.mean((y_true >= lower) & (y_true <= upper))
+        return float(covered)
 
-        Computes the fraction of true values that fall within
-        [mu - z_score * sigma, mu + z_score * sigma].
-
-        For z_score=1.96, the nominal coverage is 95%.
-
-        Args:
-            y: True targets of shape (n,).
-            mu: Predicted means of shape (n,).
-            sigma: Predicted standard deviations of shape (n,).
-            z_score: Number of standard deviations for the interval (default 1.96).
-
-        Returns:
-            Scalar coverage fraction in [0, 1].
-        """
-        y = np.asarray(y, dtype=float)
-        mu = np.asarray(mu, dtype=float)
-        sigma = np.asarray(sigma, dtype=float)
-        sigma = np.maximum(sigma, 1e-8)
-
-        lower = mu - z_score * sigma
-        upper = mu + z_score * sigma
-        within = (y >= lower) & (y <= upper)
-        return float(np.mean(within))
+    @staticmethod
+    def calibration_data(y_true: np.ndarray, mean: np.ndarray, var: np.ndarray, n_bins: int = 10):
+        """Return (expected_coverage, observed_coverage) arrays for calibration plot."""
+        from scipy.stats import norm as scipy_norm
+        std = np.sqrt(np.maximum(var, 1e-10))
+        alphas = np.linspace(0.1, 0.99, n_bins)
+        observed = []
+        for a in alphas:
+            z = scipy_norm.ppf(0.5 + a / 2)
+            cov = np.mean(np.abs(y_true - mean) <= z * std)
+            observed.append(float(cov))
+        return alphas.tolist(), observed
