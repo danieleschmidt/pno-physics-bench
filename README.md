@@ -1,96 +1,114 @@
 # pno-physics-bench
 
-Benchmarking uncertainty quantification for Physics-informed Neural Operators (PNOs) on canonical PDE problems.
+**Physics Neural Operator Benchmark** — uncertainty quantification for 1D PDE problems using Gaussian Process baselines and neural operator layers.
 
 ## Overview
 
-This library provides:
+`pno-physics-bench` provides:
 
-- **Gaussian Process baseline** — RBF kernel, Cholesky-based GP regression (numpy only)
-- **PNO uncertainty head** — two-head MLP (mean + log_var) for heteroscedastic uncertainty
-- **Calibration metrics** — NLL, CRPS, coverage, calibration error
-- **Benchmark runner** — 1D heat equation and Burgers equation benchmarks with analytical solutions
+- **GaussianProcessBaseline** — RBF kernel GP with posterior mean + variance
+- **PNOLayer** — simple feedforward neural operator outputting mean + log-variance
+- **UncertaintyMetrics** — NLL, CRPS, and coverage probability
+- **BenchmarkRunner** — runs 1D heat and Burgers equation benchmarks
+- **calibration_export** — saves results to JSON and CSV
 
-## Install
+## Installation
 
 ```bash
-pip install -e .
+pip install -r requirements.txt
 ```
 
-## Quick start
+## Quick Start
 
 ```python
-from pno_bench import BenchmarkRunner, GaussianProcessBaseline, PNOLayer
+import numpy as np
+from pno_physics_bench import BenchmarkRunner, calibration_export
 
-# Run a full benchmark
-runner = BenchmarkRunner()
-heat_results = runner.run_heat_equation(n_points=50)
-print(heat_results)
-# {'gp_nll': ..., 'pno_nll': ..., 'gp_crps': ..., ...}
+runner = BenchmarkRunner(n_train=30, n_test=20)
+results = runner.run_all()
 
-runner.export_calibration(heat_results, "heat_calibration.json")
+# Print GP metrics on heat equation
+print("Heat / GP:", results["heat"]["gp"])
+print("Heat / PNO:", results["heat"]["pno"])
 
-burgers_results = runner.run_burgers_equation(n_points=50)
-print(burgers_results)
+# Export calibration data
+calibration_export(results, "output/calibration")
 ```
 
-## Components
+## Modules
 
 ### `GaussianProcessBaseline`
 
-RBF kernel GP regression:
-
-```
-k(x, x') = σ² exp(-||x - x'||² / (2 l²))
-```
-
-Cholesky decomposition for numerical stability.
+RBF (squared exponential) kernel: `k(x1, x2) = exp(-||x1-x2||² / (2l²))`
 
 ```python
-gp = GaussianProcessBaseline(length_scale=1.0, sigma=1.0, noise=1e-3)
+from pno_physics_bench import GaussianProcessBaseline
+import numpy as np
+
+gp = GaussianProcessBaseline(length_scale=0.3, noise=1e-3)
+X_train = np.linspace(0, 1, 20)
+y_train = np.sin(2 * np.pi * X_train)
 gp.fit(X_train, y_train)
-mean, std = gp.predict(X_test)
+
+X_test = np.linspace(0, 1, 10)
+mean, variance = gp.predict(X_test)
 ```
 
 ### `PNOLayer`
 
-Physics-informed Neural Operator with a heteroscedastic uncertainty head:
-
-```
-input → hidden (ReLU) → mean head
-                       → log_var head
-std = exp(0.5 * log_var)
-```
+Two-layer MLP outputting `[mean, log_var]` per input point:
 
 ```python
-pno = PNOLayer(input_dim=1, hidden_dim=32, output_dim=1)
-pno.fit(X_train, y_train, epochs=200, lr=0.01)
-mean, std = pno.predict_with_uncertainty(X_test)
+from pno_physics_bench import PNOLayer
+import numpy as np
+
+pno = PNOLayer(input_dim=1, hidden_dim=64)
+x = np.linspace(0, 1, 50)
+mean, log_var = pno.forward(x)
+sigma = np.sqrt(np.exp(log_var))
 ```
 
 ### `UncertaintyMetrics`
 
 ```python
-from pno_bench import UncertaintyMetrics
+from pno_physics_bench import UncertaintyMetrics
+import numpy as np
 
-nll   = UncertaintyMetrics.nll(y_true, mean, std)
-crps  = UncertaintyMetrics.crps(y_true, mean, std)
-cov   = UncertaintyMetrics.coverage(y_true, mean, std, alpha=0.95)
-cal_e = UncertaintyMetrics.calibration_error(y_true, mean, std)
+y = np.array([1.0, 2.0, 3.0])
+mu = np.array([1.1, 1.9, 3.1])
+sigma = np.array([0.2, 0.3, 0.2])
+
+nll = UncertaintyMetrics.nll(y, mu, sigma)
+crps = UncertaintyMetrics.crps(y, mu, sigma)
+coverage = UncertaintyMetrics.coverage(y, mu, sigma)
 ```
 
-## PDE benchmarks
+### `BenchmarkRunner`
 
-| Equation | Analytical solution |
-|---|---|
-| Heat: `u_t = α u_xx` | `exp(-α π² t) sin(π x)` |
-| Burgers: `u_t + u u_x = ν u_xx` | Cole-Hopf transformation |
+Solves 1D PDEs using finite differences and evaluates GP vs PNO:
 
-## Tests
+- **Heat equation**: `u_t = ν u_xx`  (IC: sin(πx), Dirichlet BCs)
+- **Burgers equation**: `u_t + u u_x = ν u_xx`  (IC: -sin(x), periodic BCs)
+
+### `calibration_export`
+
+```python
+from pno_physics_bench import calibration_export
+calibration_export(results, "output/calibration")
+# Creates: output/calibration.json, output/calibration.csv
+```
+
+## Running Tests
 
 ```bash
-pytest tests/ -v
+python -m pytest tests/ -v
 ```
+
+## Dependencies
+
+- `numpy >= 1.21`
+- `scipy >= 1.7`
+- `pytest >= 7.0` (for tests)
 
 ## License
 
